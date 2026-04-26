@@ -12,6 +12,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { MealTypeIcon } from "@/components/category-icon"
 import { MEAL_TYPE_META, type MealType } from "@/lib/categories"
 import { cn } from "@/lib/utils"
+import { trackEvent, trackError } from "@/lib/posthog"
 
 export function MealsList({ meals }: { meals: MealLog[] }) {
   if (meals.length === 0) {
@@ -64,9 +65,16 @@ function MealRow({ meal, index }: { meal: MealLog; index: number }) {
   function onDelete() {
     if (!window.confirm("Delete this meal?")) return
     startTransition(async () => {
+      trackEvent("meal_deleted", {
+        meal_id: meal.id,
+        calories: meal.calories,
+        meal_type: meal.meal_type,
+      })
       const res = await deleteMeal(meal.id)
-      if (res && "ok" in res && res.ok === false) toast.error(res.error)
-      else toast.success("Meal deleted")
+      if (res && "ok" in res && res.ok === false) {
+        trackError(new Error(res.error), { context: "meal_delete_failed" })
+        toast.error(res.error)
+      } else toast.success("Meal deleted")
     })
   }
 

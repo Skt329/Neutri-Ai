@@ -15,6 +15,7 @@ import { CATEGORY_META, normalizeCategory, PANTRY_CATEGORIES, type PantryCategor
 import { CategoryIcon } from "@/components/category-icon"
 import { cn } from "@/lib/utils"
 import { basisCount, describeBasis } from "@/lib/pantry-nutrition"
+import { trackEvent, trackError } from "@/lib/posthog"
 
 export function PantryList({ items }: { items: PantryItem[] }) {
   const grouped = useMemo(() => {
@@ -120,8 +121,16 @@ function PantryRow({ item, index }: { item: PantryItem; index: number }) {
     e.stopPropagation()
     if (!window.confirm(`Remove "${item.name}"?`)) return
     startTransition(async () => {
+      trackEvent("pantry_item_deleted", {
+        item_id: item.id,
+        item_name: item.name,
+        category: item.category,
+      })
       const res = await deletePantryItem(item.id)
-      if (res && "ok" in res && res.ok === false) toast.error(res.error)
+      if (res && "ok" in res && res.ok === false) {
+        trackError(new Error(res.error), { context: "pantry_delete_failed" })
+        toast.error(res.error)
+      }
     })
   }
   const qty =

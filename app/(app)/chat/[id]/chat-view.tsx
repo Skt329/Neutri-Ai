@@ -21,6 +21,7 @@ import { ArrowLeft, MoreVertical, Send, Trash2, Pencil, Leaf, User, Wrench, Spar
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
 import { cn } from "@/lib/utils"
+import { trackEvent, trackError } from "@/lib/posthog"
 import {
   AskUserCard,
   ChooseOptionCard,
@@ -112,6 +113,10 @@ export function ChatView({
     const text = input.trim()
     if (!text || disabled) return
     setInput("")
+    trackEvent("chat_message_sent", {
+      conversation_id: conversationId,
+      message_length: text.length,
+    })
     sendMessage({ text })
   }
 
@@ -119,9 +124,14 @@ export function ChatView({
     const next = window.prompt("Rename chat", title ?? "")
     if (next == null) return
     try {
+      trackEvent("chat_renamed", {
+        conversation_id: conversationId,
+        new_title: next,
+      })
       await renameConversation(conversationId, next)
       router.refresh()
     } catch (e) {
+      trackError(e instanceof Error ? e : new Error("Rename failed"))
       toast.error(e instanceof Error ? e.message : "Rename failed")
     }
   }
@@ -129,8 +139,12 @@ export function ChatView({
   async function onDelete() {
     if (!window.confirm("Delete this chat? This cannot be undone.")) return
     try {
+      trackEvent("chat_deleted", {
+        conversation_id: conversationId,
+      })
       await deleteConversation(conversationId)
     } catch (e) {
+      trackError(e instanceof Error ? e : new Error("Delete failed"))
       toast.error(e instanceof Error ? e.message : "Delete failed")
     }
   }
@@ -210,6 +224,14 @@ function Suggestions({ onPick }: { onPick: (text: string) => void }) {
     { title: "Progress check", body: "How am I doing on protein today?" },
     { title: "Add groceries", body: "Add rice, milk, spinach, and eggs to my pantry." },
   ]
+  
+  const handlePickSuggestion = (text: string) => {
+    trackEvent("suggestion_clicked", {
+      suggestion_text: text,
+    })
+    onPick(text)
+  }
+  
   return (
     <div className="flex flex-col items-center gap-6 py-10 text-center">
       <div className="relative">
@@ -228,7 +250,7 @@ function Suggestions({ onPick }: { onPick: (text: string) => void }) {
         {suggestions.map((s, i) => (
           <button
             key={s.title}
-            onClick={() => onPick(s.body)}
+            onClick={() => handlePickSuggestion(s.body)}
             className="group flex flex-col items-start gap-1 rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-primary/40 hover:bg-accent/40 hover:shadow-sm"
             style={{ animationDelay: `${i * 60}ms` }}
           >
@@ -341,6 +363,10 @@ function ClientToolRenderer({
   const output = hasOutput ? (part.output as unknown) : null
 
   const submit = (value: unknown) => {
+    trackEvent("tool_executed", {
+      tool_name: toolName,
+      tool_call_id: part.toolCallId,
+    })
     addToolOutput({ tool: toolName, toolCallId: part.toolCallId, output: value })
   }
 
