@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { AppShell } from "@/components/app-shell"
+import { ChatFirstLayout } from "@/components/layouts/chat-first-layout"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
   if (!user) redirect("/auth/login")
 
   const { data: profile } = await supabase
@@ -20,8 +21,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell userEmail={user.email ?? ""} userName={profile?.full_name ?? null}>
+    <ChatFirstLayout userEmail={user.email ?? ""} userName={profile?.full_name ?? null}>
       {children}
-    </AppShell>
+    </ChatFirstLayout>
   )
 }
