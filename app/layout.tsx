@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Fraunces, Plus_Jakarta_Sans } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/sonner"
 import { PostHogProvider } from "@/components/posthog-provider"
 import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const fraunces = Fraunces({ subsets: ["latin"], weight: ["300", "400", "600", "700"], variable: "--font-serif" })
+const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans" })
 
 export const metadata: Metadata = {
   title: "NutriAI — Your AI Dietitian",
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1f18" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F1E9" },
+    { media: "(prefers-color-scheme: dark)", color: "#F6F1E9" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -38,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
+    <html lang="en" className={`${fraunces.variable} ${plusJakartaSans.variable} bg-background`}>
       <body className="font-sans antialiased">
         <PostHogProvider>
           {children}
