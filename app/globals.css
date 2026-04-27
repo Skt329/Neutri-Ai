@@ -4,110 +4,84 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * NutriAI design tokens.
- * Inspired by Linear, Raycast, and Apple Health: warm off-white surfaces,
- * green-600 primary, and four distinct macro accents (red / orange / yellow
- * / blue) plus a supporting green for fiber. These tokens drive the whole
- * app — semantic Tailwind classes like bg-card or text-muted-foreground
- * always resolve through here so dark mode stays consistent.
+ * NutriAI Futuristic Design System v2
+ * Modern, sleek, AI-powered theme with vibrant cyberpunk-inspired palette
+ * Primary: Cyber Green (#00E5A0) - futuristic, energetic
+ * Secondary: Electric Blue (#00B4FF) - tech-forward, trustworthy  
+ * Tertiary: Purple (#7C3AED) - premium, sophisticated
+ * Accent: Amber (#FBBF24) - highlights and alerts
  */
 
 :root {
-  /* Surfaces */
-  --background: oklch(0.988 0.003 60);              /* #FAFAF9 warm off-white */
-  --foreground: oklch(0.19 0.005 60);               /* #1C1917 stone-900 */
-  --card: oklch(1 0 0);                              /* pure white */
-  --card-foreground: oklch(0.19 0.005 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.19 0.005 60);
+  /* Core Surfaces */
+  --background: oklch(0.06 0.02 280);                /* Deep dark #0F0F1F */
+  --foreground: oklch(0.97 0.02 100);                /* Almost white #F5F5F5 */
+  --card: oklch(0.11 0.02 280);                      /* Dark card #1A1A2E */
+  --card-foreground: oklch(0.97 0.02 100);
+  --popover: oklch(0.11 0.02 280);
+  --popover-foreground: oklch(0.97 0.02 100);
 
-  /* Brand */
-  --primary: oklch(0.62 0.19 148);                   /* #16A34A green-600 */
-  --primary-foreground: oklch(0.99 0.008 148);
+  /* Primary Brand - Cyber Green */
+  --primary: oklch(0.65 0.25 160);                   /* #00E5A0 Cyber Green */
+  --primary-foreground: oklch(0.06 0.02 280);
+  
+  /* Secondary - Electric Blue */
+  --secondary: oklch(0.60 0.24 260);                 /* #00B4FF Electric Blue */
+  --secondary-foreground: oklch(0.06 0.02 280);
+  
+  /* Tertiary - Purple */
+  --tertiary: oklch(0.58 0.22 310);                  /* #7C3AED Purple */
+  --tertiary-foreground: oklch(0.97 0.02 100);
+  
+  /* Accent - Amber */
+  --accent: oklch(0.75 0.22 80);                     /* #FBBF24 Amber */
+  --accent-foreground: oklch(0.06 0.02 280);
 
-  --secondary: oklch(0.96 0.005 60);                 /* stone-100 */
-  --secondary-foreground: oklch(0.26 0.005 60);
-  --muted: oklch(0.96 0.005 60);
-  --muted-foreground: oklch(0.55 0.008 60);          /* #78716C stone-500 */
-  --accent: oklch(0.95 0.005 60);
-  --accent-foreground: oklch(0.22 0.005 60);
-  --destructive: oklch(0.64 0.23 25);                /* #EF4444 red-500 */
-  --destructive-foreground: oklch(0.99 0.008 25);
+  /* Semantic States */
+  --muted: oklch(0.20 0.01 280);                     /* Muted surface */
+  --muted-foreground: oklch(0.65 0.05 100);          /* Muted text */
+  --destructive: oklch(0.68 0.25 25);                /* #FF4444 Red */
+  --destructive-foreground: oklch(0.97 0.02 100);
 
-  --border: oklch(0.93 0.005 60);                    /* stone-200 */
-  --input: oklch(0.93 0.005 60);
-  --ring: oklch(0.62 0.19 148);
+  /* Borders & Separators */
+  --border: oklch(0.20 0.02 280);                    /* Subtle border */
+  --input: oklch(0.15 0.02 280);                     /* Input background */
+  --ring: oklch(0.65 0.25 160);                      /* Focus ring - Cyber Green */
 
-  /* Macro accents — reused everywhere meals/pantry/targets show up. */
-  --macro-cal: oklch(0.64 0.23 25);                  /* #EF4444 red */
-  --macro-protein: oklch(0.69 0.19 42);              /* #F97316 orange */
-  --macro-carbs: oklch(0.77 0.16 88);                /* #EAB308 yellow */
-  --macro-fat: oklch(0.63 0.18 258);                 /* #3B82F6 blue */
-  --macro-fiber: oklch(0.62 0.19 148);               /* green */
+  /* Macro Accents */
+  --macro-cal: oklch(0.68 0.25 25);                  /* Red - Calories */
+  --macro-protein: oklch(0.68 0.28 40);              /* Orange - Protein */
+  --macro-carbs: oklch(0.75 0.22 80);                /* Amber - Carbs */
+  --macro-fat: oklch(0.60 0.24 260);                 /* Blue - Fat */
+  --macro-fiber: oklch(0.65 0.25 160);               /* Green - Fiber */
 
-  /* Charts — keep aligned with macro order so Recharts auto-picks the right hue. */
+  /* Chart Colors */
   --chart-1: var(--macro-cal);
   --chart-2: var(--macro-protein);
   --chart-3: var(--macro-carbs);
   --chart-4: var(--macro-fat);
   --chart-5: var(--macro-fiber);
 
-  --radius: 0.875rem;
+  --radius: 1rem;
 
-  /* Sidebar — matches card surface for a clean, premium look. */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.19 0.005 60);
-  --sidebar-primary: oklch(0.62 0.19 148);
-  --sidebar-primary-foreground: oklch(0.99 0.008 148);
-  --sidebar-accent: oklch(0.96 0.005 60);
-  --sidebar-accent-foreground: oklch(0.22 0.005 60);
-  --sidebar-border: oklch(0.93 0.005 60);
-  --sidebar-ring: oklch(0.62 0.19 148);
+  /* Sidebar */
+  --sidebar: oklch(0.11 0.02 280);
+  --sidebar-foreground: oklch(0.97 0.02 100);
+  --sidebar-primary: oklch(0.65 0.25 160);
+  --sidebar-primary-foreground: oklch(0.06 0.02 280);
+  --sidebar-accent: oklch(0.20 0.01 280);
+  --sidebar-accent-foreground: oklch(0.97 0.02 100);
+  --sidebar-border: oklch(0.20 0.02 280);
+  --sidebar-ring: oklch(0.65 0.25 160);
+
+  /* Glass Morphism */
+  --glass-opacity: 0.1;
+  --glass-blur: 20px;
 }
 
+/* Dark mode is now default */
 .dark {
-  --background: oklch(0.15 0.005 60);                /* stone-950 */
-  --foreground: oklch(0.97 0.005 60);
-  --card: oklch(0.21 0.005 60);                      /* stone-900 */
-  --card-foreground: oklch(0.97 0.005 60);
-  --popover: oklch(0.21 0.005 60);
-  --popover-foreground: oklch(0.97 0.005 60);
-
-  --primary: oklch(0.72 0.19 148);                   /* brighter green in dark */
-  --primary-foreground: oklch(0.15 0.005 60);
-  --secondary: oklch(0.27 0.005 60);                 /* stone-800 */
-  --secondary-foreground: oklch(0.97 0.005 60);
-  --muted: oklch(0.27 0.005 60);
-  --muted-foreground: oklch(0.68 0.008 60);
-  --accent: oklch(0.27 0.005 60);
-  --accent-foreground: oklch(0.97 0.005 60);
-  --destructive: oklch(0.68 0.23 25);
-  --destructive-foreground: oklch(0.98 0.005 25);
-
-  --border: oklch(0.27 0.005 60);
-  --input: oklch(0.27 0.005 60);
-  --ring: oklch(0.72 0.19 148);
-
-  --macro-cal: oklch(0.70 0.21 25);
-  --macro-protein: oklch(0.74 0.18 42);
-  --macro-carbs: oklch(0.82 0.15 88);
-  --macro-fat: oklch(0.68 0.17 258);
-  --macro-fiber: oklch(0.72 0.19 148);
-
-  --chart-1: var(--macro-cal);
-  --chart-2: var(--macro-protein);
-  --chart-3: var(--macro-carbs);
-  --chart-4: var(--macro-fat);
-  --chart-5: var(--macro-fiber);
-
-  --sidebar: oklch(0.21 0.005 60);
-  --sidebar-foreground: oklch(0.97 0.005 60);
-  --sidebar-primary: oklch(0.72 0.19 148);
-  --sidebar-primary-foreground: oklch(0.15 0.005 60);
-  --sidebar-accent: oklch(0.27 0.005 60);
-  --sidebar-accent-foreground: oklch(0.97 0.005 60);
-  --sidebar-border: oklch(0.27 0.005 60);
-  --sidebar-ring: oklch(0.72 0.19 148);
+  /* Already configured for dark mode above */
 }
 
 @theme inline {
@@ -165,10 +139,179 @@
   }
 }
 
-/* Subtle celebrate pulse used by the dashboard when a goal is hit. */
-@keyframes nutri-pulse-ring {
-  0% { box-shadow: 0 0 0 0 oklch(0.62 0.19 148 / 0.35); }
-  70% { box-shadow: 0 0 0 18px oklch(0.62 0.19 148 / 0); }
-  100% { box-shadow: 0 0 0 0 oklch(0.62 0.19 148 / 0); }
+/* ================================
+ * ANIMATIONS & EFFECTS
+ * ================================ */
+
+/* Glass Morphism Effect */
+@layer utilities {
+  .glass-morphism {
+    @apply backdrop-blur-lg bg-white/10 border border-white/20;
+  }
+  
+  .glass-morphism-dark {
+    @apply backdrop-blur-lg bg-black/20 border border-white/10;
+  }
 }
-.nutri-pulse-ring { animation: nutri-pulse-ring 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+
+/* Smooth entrance animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Glow effect for primary elements */
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.65 0.25 160 / 0.3), 0 0 40px oklch(0.65 0.25 160 / 0.15);
+  }
+  50% {
+    box-shadow: 0 0 30px oklch(0.65 0.25 160 / 0.5), 0 0 60px oklch(0.65 0.25 160 / 0.25);
+  }
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Number counter animation */
+@keyframes count-up {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Celebrate pulse - used when goals are hit */
+@keyframes nutri-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 24px oklch(0.65 0.25 160 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0);
+  }
+}
+
+/* Hover lift effect */
+@keyframes lift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+/* Ripple effect on click */
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out;
+  }
+  
+  .animate-glow-pulse {
+    animation: glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+  
+  .animate-count-up {
+    animation: count-up 0.3s ease-out;
+  }
+  
+  .nutri-pulse-ring {
+    animation: nutri-pulse-ring 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  
+  .animate-lift {
+    animation: lift 0.3s ease-out;
+  }
+  
+  /* Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Gradient text utility */
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-secondary to-tertiary bg-clip-text text-transparent;
+  }
+  
+  .gradient-border {
+    @apply bg-gradient-to-r from-primary via-secondary to-tertiary p-[2px];
+  }
+  
+  .smooth-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+}
+
+/* Scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full hover:bg-primary/50;
+}
+
+/* Selection styling */
+::selection {
+  @apply bg-primary text-primary-foreground;
+}
+
