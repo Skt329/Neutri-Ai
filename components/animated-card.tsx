@@ -22,7 +22,7 @@ export function AnimatedCard({
     default: 'bg-card border-border hover:border-primary/50',
     gradient: 'bg-gradient-to-br from-card via-muted to-card border-primary/20',
     glass: 'glass-morphism',
-    premium: 'bg-gradient-to-br from-primary/10 via-secondary/5 to-tertiary/10 border-primary/30',
+    premium: 'bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border-primary/30',
   }
 
   const hoverStyles = {

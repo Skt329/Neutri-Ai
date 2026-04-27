@@ -2,17 +2,36 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Zap, Brain, BarChart3, Leaf, Shield, Smartphone, Cloud } from 'lucide-react'
 import { AnimatedCard, AnimatedCardContent } from '@/components/animated-card'
 
 export default function LandingPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (user) {
-    router.push('/chat')
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+        if (user) {
+          router.push('/chat')
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    checkUser()
+  }, [router])
+
+  if (loading) {
     return null
   }
 
@@ -153,7 +172,7 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="relative px-6 py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-tertiary/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10" />
         <div className="relative max-w-4xl mx-auto text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-bold">Ready to Transform Your Health?</h2>
           <p className="text-lg text-muted-foreground">Join thousands of users who have already achieved their nutrition goals</p>
