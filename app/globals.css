@@ -1,171 +1,166 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
 /*
- * NutriAI Design System v3
- * Warm, natural palette inspired by design reference
- * Based on Fraunces (serif display) + Plus Jakarta Sans (body)
+ * NutriAI Futuristic Design System v2
+ * Modern, sleek, AI-powered theme with vibrant cyberpunk-inspired palette
+ * Primary: Cyber Green (#00E5A0) - futuristic, energetic
+ * Secondary: Electric Blue (#00B4FF) - tech-forward, trustworthy  
+ * Tertiary: Purple (#7C3AED) - premium, sophisticated
+ * Accent: Amber (#FBBF24) - highlights and alerts
  */
 
 :root {
-  /* Primary Colors - Warm Natural Palette */
-  --cream: #F6F1E9;
-  --cream2: #EDE7DC;
-  --cream3: #E3DBCE;
-  --forest: #18382A;
-  --sage: #2E6048;
-  --sage2: #4A8263;
-  --mint: #C5E5D2;
-  --mint2: #DDEFEB;
-  --turmeric: #E09B1A;
-  --turmeric-l: #FEF3C7;
-  --clay: #C24A24;
-  --clay-l: #FDE8E0;
+  /* Core Surfaces */
+  --background: oklch(0.06 0.02 280);                /* Deep dark #0F0F1F */
+  --foreground: oklch(0.97 0.02 100);                /* Almost white #F5F5F5 */
+  --card: oklch(0.11 0.02 280);                      /* Dark card #1A1A2E */
+  --card-foreground: oklch(0.97 0.02 100);
+  --popover: oklch(0.11 0.02 280);
+  --popover-foreground: oklch(0.97 0.02 100);
 
-  /* Neutrals */
-  --ink: #16130F;
-  --stone: #776F63;
-  --fog: #B0A898;
-  --ghost: #DDD6CA;
-  --white: #FFFFFF;
+  /* Primary Brand - Cyber Green */
+  --primary: oklch(0.65 0.25 160);                   /* #00E5A0 Cyber Green */
+  --primary-foreground: oklch(0.06 0.02 280);
+  
+  /* Secondary - Electric Blue */
+  --secondary: oklch(0.60 0.24 260);                 /* #00B4FF Electric Blue */
+  --secondary-foreground: oklch(0.06 0.02 280);
+  
+  /* Tertiary - Purple */
+  --tertiary: oklch(0.58 0.22 310);                  /* #7C3AED Purple */
+  --tertiary-foreground: oklch(0.97 0.02 100);
+  
+  /* Accent - Amber */
+  --accent: oklch(0.75 0.22 80);                     /* #FBBF24 Amber */
+  --accent-foreground: oklch(0.06 0.02 280);
 
-  /* Design Tokens */
-  --background: var(--cream);
-  --foreground: var(--ink);
-  --card: var(--white);
-  --card-foreground: var(--ink);
-  --primary: var(--sage);
-  --primary-foreground: var(--white);
-  --secondary: var(--turmeric);
-  --secondary-foreground: var(--ink);
-  --accent: var(--mint);
-  --accent-foreground: var(--sage);
-  --muted: var(--cream2);
-  --muted-foreground: var(--stone);
-  --destructive: var(--clay);
-  --destructive-foreground: var(--white);
-  --border: var(--ghost);
-  --input: var(--white);
-  --ring: var(--sage);
+  /* Semantic States */
+  --muted: oklch(0.20 0.01 280);                     /* Muted surface */
+  --muted-foreground: oklch(0.65 0.05 100);          /* Muted text */
+  --destructive: oklch(0.68 0.25 25);                /* #FF4444 Red */
+  --destructive-foreground: oklch(0.97 0.02 100);
 
-  /* Border Radius */
-  --radius: 14px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  /* Borders & Separators */
+  --border: oklch(0.20 0.02 280);                    /* Subtle border */
+  --input: oklch(0.15 0.02 280);                     /* Input background */
+  --ring: oklch(0.65 0.25 160);                      /* Focus ring - Cyber Green */
 
-  /* Shadows */
-  --shadow-sm: 0 2px 16px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.12);
-  --shadow-overlay: 0 24px 80px rgba(0, 0, 0, 0.28);
+  /* Macro Accents */
+  --macro-cal: oklch(0.68 0.25 25);                  /* Red - Calories */
+  --macro-protein: oklch(0.68 0.28 40);              /* Orange - Protein */
+  --macro-carbs: oklch(0.75 0.22 80);                /* Amber - Carbs */
+  --macro-fat: oklch(0.60 0.24 260);                 /* Blue - Fat */
+  --macro-fiber: oklch(0.65 0.25 160);               /* Green - Fiber */
 
-  /* Macro Colors */
-  --macro-cal: var(--clay);
-  --macro-protein: var(--turmeric);
-  --macro-carbs: #D4AF37;
-  --macro-fat: var(--sage2);
-  --macro-fiber: var(--mint);
+  /* Chart Colors */
+  --chart-1: var(--macro-cal);
+  --chart-2: var(--macro-protein);
+  --chart-3: var(--macro-carbs);
+  --chart-4: var(--macro-fat);
+  --chart-5: var(--macro-fiber);
+
+  --radius: 1rem;
+
+  /* Sidebar */
+  --sidebar: oklch(0.11 0.02 280);
+  --sidebar-foreground: oklch(0.97 0.02 100);
+  --sidebar-primary: oklch(0.65 0.25 160);
+  --sidebar-primary-foreground: oklch(0.06 0.02 280);
+  --sidebar-accent: oklch(0.20 0.01 280);
+  --sidebar-accent-foreground: oklch(0.97 0.02 100);
+  --sidebar-border: oklch(0.20 0.02 280);
+  --sidebar-ring: oklch(0.65 0.25 160);
+
+  /* Glass Morphism */
+  --glass-opacity: 0.1;
+  --glass-blur: 20px;
+}
+
+/* Dark mode is now default */
+.dark {
+  /* Already configured for dark mode above */
 }
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
-  --font-serif: 'Fraunces', serif;
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius: var(--radius);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-macro-cal: var(--macro-cal);
+  --color-macro-protein: var(--macro-protein);
+  --color-macro-carbs: var(--macro-carbs);
+  --color-macro-fat: var(--macro-fat);
+  --color-macro-fiber: var(--macro-fiber);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  html {
+  body {
     @apply bg-background text-foreground;
   }
-  body {
-    @apply bg-background text-foreground font-sans;
+}
+
+/* ================================
+ * ANIMATIONS & EFFECTS
+ * ================================ */
+
+/* Glass Morphism Effect */
+@layer utilities {
+  .glass-morphism {
+    @apply backdrop-blur-lg bg-white/10 border border-white/20;
+  }
+  
+  .glass-morphism-dark {
+    @apply backdrop-blur-lg bg-black/20 border border-white/10;
   }
 }
 
-/* Typography */
-.display-lg {
-  font-family: var(--font-serif);
-  font-size: 44px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -2px;
-}
-
-.display-md {
-  font-family: var(--font-serif);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.display-sm {
-  font-family: var(--font-serif);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.text-xl {
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.text-base {
-  font-size: 13.5px;
-  line-height: 1.6;
-}
-
-.text-sm {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.text-xs {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
-
-.text-xxs {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* ─── ANIMATIONS ─── */
+/* Smooth entrance animation */
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -173,52 +168,107 @@
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes float {
+/* Glow effect for primary elements */
+@keyframes glow-pulse {
   0%, 100% {
-    transform: translateY(0);
+    box-shadow: 0 0 20px oklch(0.65 0.25 160 / 0.3), 0 0 40px oklch(0.65 0.25 160 / 0.15);
   }
   50% {
+    box-shadow: 0 0 30px oklch(0.65 0.25 160 / 0.5), 0 0 60px oklch(0.65 0.25 160 / 0.25);
+  }
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Number counter animation */
+@keyframes count-up {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Celebrate pulse - used when goals are hit */
+@keyframes nutri-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 24px oklch(0.65 0.25 160 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0);
+  }
+}
+
+/* Hover lift effect */
+@keyframes lift {
+  from {
+    transform: translateY(0);
+  }
+  to {
     transform: translateY(-4px);
+  }
+}
+
+/* Ripple effect on click */
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
   }
 }
 
 @layer utilities {
   .animate-fade-in-up {
-    animation: fade-in-up 0.4s ease-out;
+    animation: fade-in-up 0.5s ease-out;
   }
-
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
+  
+  .animate-glow-pulse {
+    animation: glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-
-  .animate-slide-in-right {
-    animation: slide-in-right 0.3s ease-out;
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
   }
-
-  .smooth-hover {
-    @apply transition-all duration-200 ease-out;
+  
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
   }
-
+  
+  .animate-count-up {
+    animation: count-up 0.3s ease-out;
+  }
+  
+  .nutri-pulse-ring {
+    animation: nutri-pulse-ring 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  
+  .animate-lift {
+    animation: lift 0.3s ease-out;
+  }
+  
+  /* Respect prefers-reduced-motion */
   @media (prefers-reduced-motion: reduce) {
     * {
       animation-duration: 0.01ms !important;
@@ -228,52 +278,27 @@
   }
 }
 
-/* ─── SHARED ATOMS ─── */
-.pill {
-  @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold;
+/* Gradient text utility */
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent;
+  }
+  
+  .gradient-border {
+    @apply bg-gradient-to-r from-primary via-secondary to-accent p-[2px];
+  }
+  
+  .smooth-hover {
+    @apply transition-all duration-300 ease-out;
+  }
 }
 
-.pill-green {
-  @apply bg-mint2 text-sage;
-}
-
-.pill-amber {
-  @apply bg-turmeric-l text-amber-900;
-}
-
-.pill-clay {
-  @apply bg-clay-l text-clay;
-}
-
-.pill-ghost {
-  @apply bg-cream2 text-stone;
-}
-
-.card {
-  @apply bg-card border border-border rounded-[var(--radius)] shadow-sm;
-}
-
-.avatar {
-  @apply w-8 h-8 rounded-full bg-forest text-mint flex items-center justify-center text-xs font-bold flex-shrink-0;
-}
-
-.badge {
-  @apply inline-flex items-center gap-1 px-2 py-1 rounded-[6px] text-xxs font-bold;
-}
-
-.micro-bar {
-  @apply h-1.5 rounded-full bg-cream2;
-}
-
-.micro-bar-fill {
-  @apply h-full rounded-full;
-}
-
-/* Scrollbar */
+/* Scroll behavior */
 html {
   scroll-behavior: smooth;
 }
 
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -287,6 +312,7 @@ html {
   @apply bg-muted rounded-full hover:bg-primary/50;
 }
 
+/* Selection styling */
 ::selection {
   @apply bg-primary text-primary-foreground;
 }
