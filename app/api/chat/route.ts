@@ -197,11 +197,16 @@ export async function POST(req: Request) {
         await supabase.from("conversations").update(convoUpdate).eq("id", conversationId)
 
         // Fire-and-forget: extract durable facts from this exchange into the memories table.
+        // OPTIMIZED: Only extracts ~10% of interactions using intelligent triggering
         if (lastUserText || assistantText) {
           void extractAndStoreMemories({
             userId: user.id,
             userText: lastUserText,
             assistantText,
+            conversationId,
+            messageCount: finishedMessages.length,
+            lastExtractionTime: null, // TODO: fetch from DB/cache
+            recentMessages: finishedMessages as any,
           })
         }
       } catch (e) {
