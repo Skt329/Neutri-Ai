@@ -84,7 +84,8 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
     propose_meal_log: tool({
       description:
         "Show the user a draft meal card they can review, edit, or cancel BEFORE anything is logged. " +
-        "Always call this first when the user tells you what they ate.",
+        "Always call this first when the user tells you what they ate. " +
+        "When the user says 'last night', 'yesterday lunch', etc., compute the correct logged_at timestamp relative to the current date/time provided in the system prompt.",
       inputSchema: z.object({
         description: z.string(),
         meal_type: z.enum(MEAL_TYPES),
@@ -97,6 +98,14 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
           .array(z.object({ name: z.string(), quantity: z.string().nullable() }))
           .default([]),
         notes: z.string().nullable(),
+        logged_at: z
+          .string()
+          .nullable()
+          .describe(
+            "ISO-8601 timestamp for when the meal was eaten. " +
+            "Use the current date/time from the system prompt to compute relative dates like 'last night' (yesterday ~20:00), 'yesterday lunch' (yesterday ~13:00), etc. " +
+            "If the user says 'just now' or doesn't specify, set to null (defaults to current time)."
+          ),
       }),
     }),
 
@@ -115,7 +124,7 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
 
     log_meal: tool({
       description:
-        "PERSIST a meal to the user's log. Call ONLY after `propose_meal_log` returned `{ confirmed: true }` and use the values the user confirmed.",
+        "PERSIST a meal to the user's log. Call ONLY after `propose_meal_log` returned `{ confirmed: true }` and use the values the user confirmed (including logged_at).",
       inputSchema: z.object({
         description: z.string(),
         meal_type: z.enum(MEAL_TYPES),
@@ -127,22 +136,31 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         items: z
           .array(z.object({ name: z.string(), quantity: z.string().nullable() }))
           .default([]),
+        logged_at: z
+          .string()
+          .nullable()
+          .describe("ISO-8601 timestamp for when the meal was eaten. Null defaults to current time."),
       }),
       execute: async (input) => {
+        const insertData: Record<string, unknown> = {
+          user_id: userId,
+          description: input.description,
+          meal_type: input.meal_type,
+          calories: input.calories,
+          protein_g: input.protein_g,
+          carbs_g: input.carbs_g,
+          fat_g: input.fat_g,
+          fiber_g: input.fiber_g,
+          items: input.items,
+          source: "chat",
+        }
+        // Only set logged_at if the AI provided a specific timestamp
+        if (input.logged_at) {
+          insertData.logged_at = input.logged_at
+        }
         const { data, error } = await supabase
           .from("meal_logs")
-          .insert({
-            user_id: userId,
-            description: input.description,
-            meal_type: input.meal_type,
-            calories: input.calories,
-            protein_g: input.protein_g,
-            carbs_g: input.carbs_g,
-            fat_g: input.fat_g,
-            fiber_g: input.fiber_g,
-            items: input.items,
-            source: "chat",
-          })
+          .insert(insertData)
           .select("id, logged_at")
           .single()
         if (error) return { ok: false as const, error: error.message }

@@ -9,7 +9,6 @@ import {
   memoryRateLimiter,
   memoryOptimizationTracker,
 } from "@/lib/ai/memory-optimizer"
-import type { Message } from "@/lib/types"
 
 const MemorySchema = z.object({
   memories: z.array(
@@ -40,7 +39,7 @@ export async function extractAndStoreMemories(params: {
   conversationId: string
   messageCount: number
   lastExtractionTime: Date | null
-  recentMessages?: Message[]
+  recentMessages?: any[]
 }) {
   const { userId, userText, assistantText, conversationId, messageCount, lastExtractionTime, recentMessages = [] } = params
 

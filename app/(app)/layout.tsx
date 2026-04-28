@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { ChatFirstLayout } from "@/components/layouts/chat-first-layout"
+import { getAuthUser } from "@/lib/supabase/auth"
+import { NutriShell } from "@/components/layouts/nutri-shell"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
 
   if (!user) redirect("/auth/login")
 
@@ -21,8 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <ChatFirstLayout userEmail={user.email ?? ""} userName={profile?.full_name ?? null}>
+    <NutriShell userName={profile?.full_name ?? null}>
       {children}
-    </ChatFirstLayout>
+    </NutriShell>
   )
 }

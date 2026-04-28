@@ -7,6 +7,14 @@ const AUTH_ONLY_PATHS = ["/auth/login", "/auth/sign-up"]
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  const { pathname } = request.nextUrl
+
+  // API routes handle their own auth — skip getUser() here to avoid
+  // double Supabase round-trips and edge-runtime timeout issues.
+  if (pathname.startsWith("/api/")) {
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -24,11 +32,16 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (err) {
+    // Supabase auth can timeout on slow connections — don't crash the proxy.
+    // Protected-route redirect will still fire (user stays null).
+    console.warn("[proxy] auth.getUser() failed:", err instanceof Error ? err.message : err)
+  }
 
-  const { pathname } = request.nextUrl
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
   const isAuthOnly = AUTH_ONLY_PATHS.some((p) => pathname === p)
 

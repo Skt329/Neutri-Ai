@@ -10,6 +10,11 @@ import { sumTotals } from "@/lib/nutrition"
 import { computeStreakInfo } from "@/lib/streaks"
 import { computeMealGap } from "@/lib/meal-gaps"
 
+// Use Node.js runtime for more reliable Supabase connectivity.
+// Edge runtime has stricter fetch timeout behavior that causes
+// ConnectTimeoutError on slow/intermittent connections.
+export const runtime = "nodejs"
+
 async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
   try {
     const { text } = await generateText({
@@ -43,9 +48,26 @@ export const maxDuration = 60
 
 export async function POST(req: Request) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+
+  // Retry auth once if the first attempt times out (transient network issues)
+  let user = null
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+      break
+    } catch (err) {
+      console.warn(`[chat] auth.getUser() attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err)
+      if (attempt === 1) {
+        return NextResponse.json(
+          { error: "Authentication timed out. Please refresh and try again." },
+          { status: 503 },
+        )
+      }
+      // Brief pause before retry
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+  }
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = (await req.json()) as { messages: UIMessage[]; conversationId: string }
@@ -160,13 +182,31 @@ export async function POST(req: Request) {
     tools,
     stopWhen: stepCountIs(12),
     onError: ({ error }) => {
-      console.log("[v0] streamText error:", error)
+      console.log("[chat] streamText error:", error)
+    },
+    onStepFinish: ({ toolCalls, toolResults, text, stepType }) => {
+      console.log("[chat] step finished:", {
+        stepType,
+        textLength: text?.length ?? 0,
+        toolCalls: toolCalls?.map((tc: any) => ({ name: tc.toolName, id: tc.toolCallId })),
+        toolResults: toolResults?.map((tr: any) => ({ name: tr.toolName, id: tr.toolCallId, hasResult: !!tr.result })),
+      })
     },
   })
 
   return result.toUIMessageStreamResponse({
     originalMessages: messages,
     async onFinish({ messages: finishedMessages }) {
+      // DEBUG: log what the model produced
+      console.log("[chat] onFinish — message count:", finishedMessages.length)
+      for (const m of finishedMessages) {
+        console.log(`[chat]   role=${m.role}, parts=${m.parts.length}:`, m.parts.map((p: any) => ({
+          type: p.type,
+          text: p.type === "text" ? p.text?.substring(0, 80) : undefined,
+          toolName: p.toolInvocation?.toolName ?? p.toolName,
+          state: p.toolInvocation?.state ?? p.state,
+        })))
+      }
       try {
         // Persist the last user message + all new assistant/tool messages.
         // We rewrite the full conversation messages list for simplicity (small volumes here).

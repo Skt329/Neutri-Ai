@@ -1,74 +1,31 @@
 'use client'
 
-import { Utensils, Package, BarChart3, Lightbulb } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { trackEvent } from '@/lib/posthog'
 
-interface QuickActionsProps {
-  onMeals: () => void
-  onPantry: () => void
-  onAnalytics: () => void
-  onInsights: () => void
-}
+const ACTIONS = [
+  { emoji: '🍽️', label: 'Log a meal', prompt: 'I want to log a meal' },
+  { emoji: '🛒', label: 'Order groceries', prompt: 'Add items to my pantry' },
+  { emoji: '📋', label: 'Suggest meal plan', prompt: 'Suggest a meal plan for today' },
+  { emoji: '📊', label: 'Check my progress', prompt: 'How am I doing today? Show me my daily totals' },
+  { emoji: '🔍', label: 'Find a recipe', prompt: 'Suggest a recipe from my pantry items' },
+] as const
 
-export function QuickActions({
-  onMeals,
-  onPantry,
-  onAnalytics,
-  onInsights,
-}: QuickActionsProps) {
-  const actions = [
-    {
-      icon: Utensils,
-      label: 'Meals',
-      description: 'View & manage meals',
-      onClick: onMeals,
-      color: 'from-orange-500 to-red-500',
-    },
-    {
-      icon: Package,
-      label: 'Pantry',
-      description: 'Check pantry items',
-      onClick: onPantry,
-      color: 'from-green-500 to-emerald-500',
-    },
-    {
-      icon: BarChart3,
-      label: 'Analytics',
-      description: 'View nutrition stats',
-      onClick: onAnalytics,
-      color: 'from-blue-500 to-cyan-500',
-    },
-    {
-      icon: Lightbulb,
-      label: 'Insights',
-      description: 'Get recommendations',
-      onClick: onInsights,
-      color: 'from-purple-500 to-pink-500',
-    },
-  ]
-
+export function QuickActions({ onPick }: { onPick: (prompt: string) => void }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-      {actions.map((action, idx) => {
-        const Icon = action.icon
-        return (
-          <button
-            key={idx}
-            onClick={action.onClick}
-            className={`
-              group relative p-3 rounded-lg transition-all duration-300 ease-out
-              bg-gradient-to-br ${action.color} opacity-20
-              hover:opacity-30 active:scale-95
-              flex flex-col items-center justify-center gap-2
-              border border-current/20 hover:border-current/40
-            `}
-          >
-            <Icon className="w-5 h-5" />
-            <span className="text-xs font-semibold text-center">{action.label}</span>
-            <span className="text-xs opacity-75 hidden group-hover:block">{action.description}</span>
-          </button>
-        )
-      })}
+    <div className="flex flex-wrap gap-1.5 px-4 py-2 md:px-6">
+      {ACTIONS.map((a) => (
+        <button
+          key={a.label}
+          onClick={() => {
+            trackEvent('quick_action_clicked', { label: a.label })
+            onPick(a.prompt)
+          }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-stone hover:border-sage/30 hover:bg-cream2 hover:text-ink smooth-hover"
+        >
+          <span>{a.emoji}</span>
+          {a.label}
+        </button>
+      ))}
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import type { Message } from "@/lib/types"
 
 /**
  * Enterprise memory extraction optimizer
@@ -31,6 +30,17 @@ interface MemoryExtractionResult {
   memoriesExtracted: number
 }
 
+// Lightweight message shape used only by the optimizer — avoids importing
+// a non-existent `Message` type from @/lib/types.
+interface OptMessage {
+  id?: string
+  role?: string
+  parts?: unknown
+  content?: string
+  created_at?: string
+  conversation_id?: string
+}
+
 /**
  * Probabilistic trigger - run ~10% of interactions
  * Reduces redundant processing while maintaining good context
@@ -54,7 +64,7 @@ async function shouldTriggerOnThreshold(
   userId: string,
   conversationId: string
 ): Promise<{ trigger: boolean; reason?: string }> {
-  const client = createClient()
+  const client = await createClient()
 
   // Check meals logged in last 24 hours
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -83,10 +93,23 @@ async function shouldTriggerOnThreshold(
  */
 async function shouldTriggerOnEvent(
   userId: string,
-  recentMessages: Message[]
+  recentMessages: OptMessage[]
 ): Promise<{ trigger: boolean; reason?: string }> {
   // Check for goal-related content in recent messages
-  const recentContent = recentMessages.slice(-5).map((m) => m.content).join(" ")
+  const recentContent = recentMessages
+    .slice(-5)
+    .map((m) => {
+      // Support both `content` (plain string) and `parts` (structured)
+      if (typeof m.content === "string") return m.content
+      if (Array.isArray(m.parts)) {
+        return (m.parts as Array<{ type?: string; text?: string }>)
+          .filter((p) => p.type === "text")
+          .map((p) => p.text ?? "")
+          .join(" ")
+      }
+      return ""
+    })
+    .join(" ")
 
   const goalKeywords = [
     "goal",
@@ -115,7 +138,7 @@ export async function shouldExtractMemory(
   conversationId: string,
   messageCount: number,
   lastExtractionTime: Date | null,
-  recentMessages: Message[]
+  recentMessages: OptMessage[]
 ): Promise<{ trigger: boolean; reason?: string }> {
   // Always trigger on user action (manual save)
   // Handled by caller
@@ -153,14 +176,14 @@ export async function getBatchMessagesForExtraction(
   conversationId: string,
   lastExtractionTime: Date | null,
   maxMessages: number = 10
-): Promise<Message[]> {
-  const client = createClient()
+): Promise<OptMessage[]> {
+  const client = await createClient()
 
   const startTime = lastExtractionTime || new Date(Date.now() - 24 * 60 * 60 * 1000)
 
   const { data: messages, error } = await client
     .from("messages")
-    .select("id, conversation_id, role, content, created_at")
+    .select("id, conversation_id, role, parts, created_at")
     .eq("conversation_id", conversationId)
     .gte("created_at", startTime.toISOString())
     .order("created_at", { ascending: false })
@@ -179,12 +202,12 @@ export async function getBatchMessagesForExtraction(
  * Uses content hash to detect duplicates
  */
 export async function isDuplicateMemory(userId: string, newMemory: string): Promise<boolean> {
-  const client = createClient()
+  const client = await createClient()
 
   // Simple dedup: check if similar memory exists (in real system, use embeddings)
   const { data: existingMemories, error } = await client
     .from("memories")
-    .select("id, memory_text")
+    .select("id, content")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(5)
@@ -194,7 +217,7 @@ export async function isDuplicateMemory(userId: string, newMemory: string): Prom
   // Basic string similarity check (80%+ match = duplicate)
   const newNormalized = newMemory.toLowerCase().trim()
   return existingMemories.some((mem) => {
-    const existingNormalized = mem.memory_text.toLowerCase().trim()
+    const existingNormalized = (mem.content ?? "").toLowerCase().trim()
     const similarity = calculateSimilarity(newNormalized, existingNormalized)
     return similarity > 0.8
   })

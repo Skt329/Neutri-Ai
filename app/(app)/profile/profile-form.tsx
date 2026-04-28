@@ -45,18 +45,18 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         <SectionHeader title="About you" description="Body metrics used to calculate your targets." />
         <Field>
           <FieldLabel htmlFor="full_name">Full name</FieldLabel>
-          <Input id="full_name" name="full_name" required defaultValue={profile.full_name ?? ""} />
+          <Input id="full_name" name="full_name" required defaultValue={profile.full_name ?? ""} className="bg-cream2/50 border-cream3 focus:border-sage" />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="age">Age</FieldLabel>
-            <Input id="age" name="age" type="number" min={13} max={120} required defaultValue={profile.age ?? ""} />
+            <Input id="age" name="age" type="number" min={13} max={120} required defaultValue={profile.age ?? ""} className="bg-cream2/50 border-cream3 focus:border-sage" />
           </Field>
           <Field>
             <FieldLabel htmlFor="sex">Sex</FieldLabel>
             <Select name="sex" defaultValue={profile.sex ?? "prefer_not_say"}>
-              <SelectTrigger id="sex">
+              <SelectTrigger id="sex" className="bg-cream2/50 border-cream3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -72,25 +72,11 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="height_cm">Height (cm)</FieldLabel>
-            <Input
-              id="height_cm"
-              name="height_cm"
-              type="number"
-              step="0.1"
-              required
-              defaultValue={profile.height_cm ?? ""}
-            />
+            <Input id="height_cm" name="height_cm" type="number" step="0.1" required defaultValue={profile.height_cm ?? ""} className="bg-cream2/50 border-cream3 focus:border-sage" />
           </Field>
           <Field>
             <FieldLabel htmlFor="weight_kg">Weight (kg)</FieldLabel>
-            <Input
-              id="weight_kg"
-              name="weight_kg"
-              type="number"
-              step="0.1"
-              required
-              defaultValue={profile.weight_kg ?? ""}
-            />
+            <Input id="weight_kg" name="weight_kg" type="number" step="0.1" required defaultValue={profile.weight_kg ?? ""} className="bg-cream2/50 border-cream3 focus:border-sage" />
           </Field>
         </div>
 
@@ -98,7 +84,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           <Field>
             <FieldLabel htmlFor="activity_level">Activity level</FieldLabel>
             <Select name="activity_level" defaultValue={profile.activity_level ?? "moderate"}>
-              <SelectTrigger id="activity_level">
+              <SelectTrigger id="activity_level" className="bg-cream2/50 border-cream3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -113,7 +99,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           <Field>
             <FieldLabel htmlFor="goal">Goal</FieldLabel>
             <Select name="goal" defaultValue={profile.goal ?? "maintain"}>
-              <SelectTrigger id="goal">
+              <SelectTrigger id="goal" className="bg-cream2/50 border-cream3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -129,59 +115,33 @@ export function ProfileForm({ profile }: { profile: Profile }) {
 
       {/* ── Food preferences ── */}
       <FieldGroup>
-        <SectionHeader
-          title="Food preferences"
-          description="NutriAI uses these to suggest recipes you'll enjoy."
-        />
-
+        <SectionHeader title="Food preferences" description="NutriAI uses these to suggest recipes you'll enjoy." />
         <FieldSet>
           <FieldLegend>Dietary style</FieldLegend>
-          <ChipInput
-            name="dietary_preferences"
-            defaultValue={profile.dietary_preferences}
-            suggestions={[...DIETARY_PREFERENCES]}
-            placeholder="Add a preference…"
-          />
+          <ChipInput name="dietary_preferences" defaultValue={profile.dietary_preferences} suggestions={[...DIETARY_PREFERENCES]} placeholder="Add a preference…" />
         </FieldSet>
-
         <FieldSet>
           <FieldLegend>Preferred cuisines</FieldLegend>
-          <ChipInput
-            name="cuisines"
-            defaultValue={profile.cuisines}
-            suggestions={[...CUISINES]}
-            placeholder="Add a cuisine…"
-          />
+          <ChipInput name="cuisines" defaultValue={profile.cuisines} suggestions={[...CUISINES]} placeholder="Add a cuisine…" />
         </FieldSet>
-
         <FieldSet>
           <FieldLegend>Favorite ingredients</FieldLegend>
-          <ChipInput
-            name="favorite_ingredients"
-            defaultValue={profile.favorite_ingredients}
-            placeholder="e.g. paneer, avocado…"
-          />
+          <ChipInput name="favorite_ingredients" defaultValue={profile.favorite_ingredients} placeholder="e.g. paneer, avocado…" />
         </FieldSet>
-
         <FieldSet>
           <FieldLegend>Ingredients to avoid</FieldLegend>
-          <ChipInput
-            name="disliked_ingredients"
-            defaultValue={profile.disliked_ingredients}
-            placeholder="e.g. mushrooms…"
-          />
+          <ChipInput name="disliked_ingredients" defaultValue={profile.disliked_ingredients} placeholder="e.g. mushrooms…" />
         </FieldSet>
       </FieldGroup>
 
       {/* ── Kitchen ── */}
       <FieldGroup>
         <SectionHeader title="Your kitchen" description="We only suggest recipes you can actually cook." />
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="cooking_skill">Cooking skill</FieldLabel>
             <Select name="cooking_skill" defaultValue={profile.cooking_skill ?? "intermediate"}>
-              <SelectTrigger id="cooking_skill">
+              <SelectTrigger id="cooking_skill" className="bg-cream2/50 border-cream3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -193,26 +153,13 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           </Field>
           <Field>
             <FieldLabel htmlFor="household_size">Household size</FieldLabel>
-            <Input
-              id="household_size"
-              name="household_size"
-              type="number"
-              min={1}
-              max={20}
-              defaultValue={profile.household_size ?? 1}
-            />
+            <Input id="household_size" name="household_size" type="number" min={1} max={20} defaultValue={profile.household_size ?? 1} className="bg-cream2/50 border-cream3 focus:border-sage" />
             <FieldDescription>People you typically cook for.</FieldDescription>
           </Field>
         </div>
-
         <FieldSet>
           <FieldLegend>Appliances</FieldLegend>
-          <ChipInput
-            name="kitchen_appliances"
-            defaultValue={profile.kitchen_appliances}
-            suggestions={[...KITCHEN_APPLIANCES]}
-            placeholder="Add an appliance…"
-          />
+          <ChipInput name="kitchen_appliances" defaultValue={profile.kitchen_appliances} suggestions={[...KITCHEN_APPLIANCES]} placeholder="Add an appliance…" />
         </FieldSet>
       </FieldGroup>
 
@@ -221,21 +168,11 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         <SectionHeader title="Health" description="Optional — helps us tailor suggestions safely." />
         <FieldSet>
           <FieldLegend>Allergies</FieldLegend>
-          <ChipInput
-            name="allergies"
-            defaultValue={profile.allergies}
-            suggestions={[...COMMON_ALLERGIES]}
-            placeholder="Add an allergy…"
-          />
+          <ChipInput name="allergies" defaultValue={profile.allergies} suggestions={[...COMMON_ALLERGIES]} placeholder="Add an allergy…" />
         </FieldSet>
         <FieldSet>
           <FieldLegend>Health conditions</FieldLegend>
-          <ChipInput
-            name="health_conditions"
-            defaultValue={profile.health_conditions}
-            suggestions={[...COMMON_HEALTH]}
-            placeholder="Add a condition…"
-          />
+          <ChipInput name="health_conditions" defaultValue={profile.health_conditions} suggestions={[...COMMON_HEALTH]} placeholder="Add a condition…" />
         </FieldSet>
       </FieldGroup>
 
@@ -247,8 +184,8 @@ export function ProfileForm({ profile }: { profile: Profile }) {
 function SectionHeader({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <p className="text-sm text-stone">{description}</p>
     </div>
   )
 }
@@ -256,7 +193,7 @@ function SectionHeader({ title, description }: { title: string; description: str
 function Submit() {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" disabled={pending} size="lg">
+    <Button type="submit" disabled={pending} size="lg" className="bg-forest hover:bg-sage text-white rounded-full">
       {pending ? (
         <>
           <Spinner className="size-4" /> Saving…

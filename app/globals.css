@@ -4,89 +4,95 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * NutriAI Futuristic Design System v2
- * Modern, sleek, AI-powered theme with vibrant cyberpunk-inspired palette
- * Primary: Cyber Green (#00E5A0) - futuristic, energetic
- * Secondary: Electric Blue (#00B4FF) - tech-forward, trustworthy  
- * Tertiary: Purple (#7C3AED) - premium, sophisticated
- * Accent: Amber (#FBBF24) - highlights and alerts
+ * NutriAI — Warm Organic Design System
+ * Cream & Forest palette inspired by natural nutrition
+ * Primary: Forest Green (#18382A)
+ * Accent: Turmeric (#E09B1A)
+ * Warning: Clay (#C24A24)
  */
 
 :root {
-  /* Core Surfaces */
-  --background: oklch(0.06 0.02 280);                /* Deep dark #0F0F1F */
-  --foreground: oklch(0.97 0.02 100);                /* Almost white #F5F5F5 */
-  --card: oklch(0.11 0.02 280);                      /* Dark card #1A1A2E */
-  --card-foreground: oklch(0.97 0.02 100);
-  --popover: oklch(0.11 0.02 280);
-  --popover-foreground: oklch(0.97 0.02 100);
+  /* ── Core Surfaces ── */
+  --cream: #F6F1E9;
+  --cream2: #EDE7DC;
+  --cream3: #E3DBCE;
+  --white: #FFFFFF;
 
-  /* Primary Brand - Cyber Green */
-  --primary: oklch(0.65 0.25 160);                   /* #00E5A0 Cyber Green */
-  --primary-foreground: oklch(0.06 0.02 280);
-  
-  /* Secondary - Electric Blue */
-  --secondary: oklch(0.60 0.24 260);                 /* #00B4FF Electric Blue */
-  --secondary-foreground: oklch(0.06 0.02 280);
-  
-  /* Tertiary - Purple */
-  --tertiary: oklch(0.58 0.22 310);                  /* #7C3AED Purple */
-  --tertiary-foreground: oklch(0.97 0.02 100);
-  
-  /* Accent - Amber */
-  --accent: oklch(0.75 0.22 80);                     /* #FBBF24 Amber */
-  --accent-foreground: oklch(0.06 0.02 280);
+  /* ── Brand Greens ── */
+  --forest: #18382A;
+  --sage: #2E6048;
+  --sage2: #4A8263;
+  --mint: #C5E5D2;
+  --mint2: #DDEFEB;
 
-  /* Semantic States */
-  --muted: oklch(0.20 0.01 280);                     /* Muted surface */
-  --muted-foreground: oklch(0.65 0.05 100);          /* Muted text */
-  --destructive: oklch(0.68 0.25 25);                /* #FF4444 Red */
-  --destructive-foreground: oklch(0.97 0.02 100);
+  /* ── Accent Colors ── */
+  --turmeric: #E09B1A;
+  --turmeric-l: #FEF3C7;
+  --clay: #C24A24;
+  --clay-l: #FDE8E0;
 
-  /* Borders & Separators */
-  --border: oklch(0.20 0.02 280);                    /* Subtle border */
-  --input: oklch(0.15 0.02 280);                     /* Input background */
-  --ring: oklch(0.65 0.25 160);                      /* Focus ring - Cyber Green */
+  /* ── Text Colors ── */
+  --ink: #16130F;
+  --stone: #776F63;
+  --fog: #B0A898;
+  --ghost: #DDD6CA;
 
-  /* Macro Accents */
-  --macro-cal: oklch(0.68 0.25 25);                  /* Red - Calories */
-  --macro-protein: oklch(0.68 0.28 40);              /* Orange - Protein */
-  --macro-carbs: oklch(0.75 0.22 80);                /* Amber - Carbs */
-  --macro-fat: oklch(0.60 0.24 260);                 /* Blue - Fat */
-  --macro-fiber: oklch(0.65 0.25 160);               /* Green - Fiber */
+  /* ── Semantic Tokens (mapped for shadcn) ── */
+  --background: var(--cream);
+  --foreground: var(--ink);
+  --card: var(--white);
+  --card-foreground: var(--ink);
+  --popover: var(--white);
+  --popover-foreground: var(--ink);
+  --primary: var(--forest);
+  --primary-foreground: var(--white);
+  --secondary: var(--cream2);
+  --secondary-foreground: var(--stone);
+  --muted: var(--cream2);
+  --muted-foreground: var(--stone);
+  --accent: var(--turmeric);
+  --accent-foreground: var(--ink);
+  --destructive: var(--clay);
+  --destructive-foreground: var(--white);
+  --border: rgba(0,0,0,0.07);
+  --input: var(--cream2);
+  --ring: var(--sage);
 
-  /* Chart Colors */
+  /* ── Macro Colors ── */
+  --macro-cal: #C24A24;
+  --macro-protein: #F97316;
+  --macro-carbs: #EAB308;
+  --macro-fat: #3B82F6;
+  --macro-fiber: #10B981;
+
+  /* ── Chart Colors ── */
   --chart-1: var(--macro-cal);
   --chart-2: var(--macro-protein);
   --chart-3: var(--macro-carbs);
   --chart-4: var(--macro-fat);
   --chart-5: var(--macro-fiber);
 
-  --radius: 1rem;
+  --radius: 0.875rem;
 
-  /* Sidebar */
-  --sidebar: oklch(0.11 0.02 280);
-  --sidebar-foreground: oklch(0.97 0.02 100);
-  --sidebar-primary: oklch(0.65 0.25 160);
-  --sidebar-primary-foreground: oklch(0.06 0.02 280);
-  --sidebar-accent: oklch(0.20 0.01 280);
-  --sidebar-accent-foreground: oklch(0.97 0.02 100);
-  --sidebar-border: oklch(0.20 0.02 280);
-  --sidebar-ring: oklch(0.65 0.25 160);
+  /* ── Sidebar (used for history panel) ── */
+  --sidebar: var(--forest);
+  --sidebar-foreground: rgba(255,255,255,0.85);
+  --sidebar-primary: var(--sage);
+  --sidebar-primary-foreground: var(--white);
+  --sidebar-accent: rgba(255,255,255,0.08);
+  --sidebar-accent-foreground: rgba(255,255,255,0.75);
+  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-ring: var(--sage);
 
-  /* Glass Morphism */
-  --glass-opacity: 0.1;
-  --glass-blur: 20px;
-}
-
-/* Dark mode is now default */
-.dark {
-  /* Already configured for dark mode above */
+  /* ── Shadows ── */
+  --sh: 0 2px 16px rgba(0,0,0,0.08);
+  --sh2: 0 4px 24px rgba(0,0,0,0.12);
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -97,8 +103,6 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-tertiary: var(--tertiary);
-  --color-tertiary-foreground: var(--tertiary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -130,6 +134,24 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Custom colors for direct use */
+  --color-cream: var(--cream);
+  --color-cream2: var(--cream2);
+  --color-cream3: var(--cream3);
+  --color-forest: var(--forest);
+  --color-sage: var(--sage);
+  --color-sage2: var(--sage2);
+  --color-mint: var(--mint);
+  --color-mint2: var(--mint2);
+  --color-turmeric: var(--turmeric);
+  --color-turmeric-l: var(--turmeric-l);
+  --color-clay: var(--clay);
+  --color-clay-l: var(--clay-l);
+  --color-ink: var(--ink);
+  --color-stone: var(--stone);
+  --color-fog: var(--fog);
+  --color-ghost: var(--ghost);
 }
 
 @layer base {
@@ -141,134 +163,110 @@
   }
 }
 
-/* ================================
- * ANIMATIONS & EFFECTS
- * ================================ */
+/* ════════════════════════════════════════════
+   ANIMATIONS
+════════════════════════════════════════════ */
 
-/* Glass Morphism Effect */
-@layer utilities {
-  .glass-morphism {
-    @apply backdrop-blur-lg bg-white/10 border border-white/20;
-  }
-  
-  .glass-morphism-dark {
-    @apply backdrop-blur-lg bg-black/20 border border-white/10;
-  }
-}
-
-/* Smooth entrance animation */
 @keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Glow effect for primary elements */
-@keyframes glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 20px oklch(0.65 0.25 160 / 0.3), 0 0 40px oklch(0.65 0.25 160 / 0.15);
-  }
-  50% {
-    box-shadow: 0 0 30px oklch(0.65 0.25 160 / 0.5), 0 0 60px oklch(0.65 0.25 160 / 0.25);
-  }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* Floating animation */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-/* Shimmer loading effect */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-up {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes draw-ring {
+  from { stroke-dashoffset: 452; }
+}
+
 @keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
 
-/* Number counter animation */
-@keyframes count-up {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
 }
 
-/* Celebrate pulse - used when goals are hit */
 @keyframes nutri-pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 24px oklch(0.65 0.25 160 / 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 oklch(0.65 0.25 160 / 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(46,96,72,0.3); }
+  70% { box-shadow: 0 0 0 18px rgba(46,96,72,0); }
+  100% { box-shadow: 0 0 0 0 rgba(46,96,72,0); }
 }
 
-/* Hover lift effect */
-@keyframes lift {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-4px);
-  }
+@keyframes progress-fill {
+  from { width: 0; }
 }
 
-/* Ripple effect on click */
-@keyframes ripple {
-  to {
-    transform: scale(4);
-    opacity: 0;
-  }
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @layer utilities {
   .animate-fade-in-up {
-    animation: fade-in-up 0.5s ease-out;
+    animation: fade-in-up 0.5s ease-out both;
   }
-  
-  .animate-glow-pulse {
-    animation: glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out both;
   }
-  
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  .animate-slide-in-left {
+    animation: slide-in-left 0.4s ease-out both;
   }
-  
+  .animate-slide-in-right {
+    animation: slide-in-right 0.4s ease-out both;
+  }
+  .animate-slide-up {
+    animation: slide-up 0.35s ease-out both;
+  }
+  .animate-scale-up {
+    animation: scale-up 0.3s ease-out both;
+  }
   .animate-shimmer {
     animation: shimmer 2s infinite;
   }
-  
-  .animate-count-up {
-    animation: count-up 0.3s ease-out;
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
   }
-  
+  .animate-progress-fill {
+    animation: progress-fill 0.8s ease-out both;
+  }
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s ease-in-out infinite;
+  }
   .nutri-pulse-ring {
     animation: nutri-pulse-ring 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
-  
-  .animate-lift {
-    animation: lift 0.3s ease-out;
+  .font-display {
+    font-family: var(--font-display);
   }
-  
-  /* Respect prefers-reduced-motion */
+  .smooth-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * {
       animation-duration: 0.01ms !important;
@@ -278,19 +276,26 @@
   }
 }
 
-/* Gradient text utility */
-@layer utilities {
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent;
-  }
-  
-  .gradient-border {
-    @apply bg-gradient-to-r from-primary via-secondary to-accent p-[2px];
-  }
-  
-  .smooth-hover {
-    @apply transition-all duration-300 ease-out;
-  }
+/* ════════════════════════════════════════════
+   CUSTOM COMPONENT STYLES
+════════════════════════════════════════════ */
+
+/* Calorie ring draw animation */
+.ring-animated circle {
+  transition: stroke-dasharray 1s ease-out, stroke-dashoffset 1s ease-out;
+}
+
+/* Macro progress bar animation */
+.macro-bar-fill {
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Chat bubbles */
+.bubble-user {
+  border-radius: 18px 18px 4px 18px;
+}
+.bubble-ai {
+  border-radius: 4px 18px 18px 18px;
 }
 
 /* Scroll behavior */
@@ -300,20 +305,39 @@ html {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  @apply bg-background;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted rounded-full hover:bg-primary/50;
+  background: var(--ghost);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fog);
 }
 
-/* Selection styling */
+/* Selection */
 ::selection {
-  @apply bg-primary text-primary-foreground;
+  background: var(--mint);
+  color: var(--forest);
 }
 
+/* Prose for chat markdown */
+.prose-chat {
+  line-height: 1.6;
+}
+.prose-chat p { margin-bottom: 0.5rem; }
+.prose-chat p:last-child { margin-bottom: 0; }
+.prose-chat ul { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+.prose-chat ol { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+.prose-chat li { margin-bottom: 0.25rem; }
+.prose-chat strong { font-weight: 600; color: var(--forest); }
+.prose-chat code {
+  background: var(--cream2);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

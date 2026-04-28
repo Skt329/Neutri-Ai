@@ -1,21 +1,21 @@
-import { createClient } from "@/lib/supabase/server"
-import { PageHeader } from "@/components/page-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { getAuthUser } from "@/lib/supabase/auth"
+import { Button } from "@/components/ui/button"
 import { ProfileForm } from "./profile-form"
 import { RecomputeButton } from "./recompute-button"
-import { BmiBar } from "@/components/bmi-bar"
 import { formatNumber } from "@/lib/format"
 import { MACRO_META } from "@/lib/macro-colors"
 import type { NutritionTargets, Profile, WeightLog } from "@/lib/types"
-import { TrendingDown, TrendingUp, Minus } from "lucide-react"
+import {
+  User, Activity, Target, Heart, ChefHat, Scale,
+  TrendingDown, TrendingUp, Minus, Pencil, Flame, Drumstick, Wheat, Droplet, Salad,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return null
 
   const [{ data: profile }, { data: targets }, { data: weights }] = await Promise.all([
@@ -40,162 +40,253 @@ export default async function ProfilePage() {
   const oldest = recentWeights[recentWeights.length - 1]
   const newest = recentWeights[0]
   const weightDelta =
-    newest && oldest && recentWeights.length > 1 ? Number(newest.weight_kg) - Number(oldest.weight_kg) : null
+    newest && oldest && recentWeights.length > 1
+      ? Number(newest.weight_kg) - Number(oldest.weight_kg)
+      : null
+
+  const goalLabels: Record<string, string> = {
+    lose: "Lose fat",
+    maintain: "Maintain",
+    gain: "Gain muscle",
+    recomp: "Recomp",
+  }
+
+  const activityLabels: Record<string, string> = {
+    sedentary: "Sedentary",
+    light: "Light",
+    moderate: "Moderate",
+    active: "Active",
+    very_active: "Very Active",
+  }
+
+  // BMI calculation
+  const bmi =
+    profile?.height_cm && profile?.weight_kg
+      ? Number(profile.weight_kg) / Math.pow(Number(profile.height_cm) / 100, 2)
+      : null
+
+  const bmiCategory = bmi
+    ? bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese"
+    : null
 
   return (
-    <>
-      <PageHeader title="Profile" description="Your metrics, preferences, and daily targets." />
-      <div className="grid gap-6 p-4 md:p-8 lg:grid-cols-[1fr_340px]">
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your info</CardTitle>
-              <CardDescription>Changes automatically update NutriAI&apos;s suggestions.</CardDescription>
-            </CardHeader>
-            <CardContent>{profile ? <ProfileForm profile={profile} /> : <p>Profile not found.</p>}</CardContent>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <BmiBar heightCm={profile?.height_cm ?? null} weightKg={profile?.weight_kg ?? null} />
-
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="text-base">Daily targets</CardTitle>
-              <CardDescription>Computed from your body metrics, activity, and goal.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {targets ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <TargetTile
-                    label="Calories"
-                    value={formatNumber(targets.calories)}
-                    unit="kcal"
-                    color={MACRO_META.calories.color}
-                  />
-                  <TargetTile
-                    label="Protein"
-                    value={formatNumber(targets.protein_g)}
-                    unit="g"
-                    color={MACRO_META.protein.color}
-                  />
-                  <TargetTile
-                    label="Carbs"
-                    value={formatNumber(targets.carbs_g)}
-                    unit="g"
-                    color={MACRO_META.carbs.color}
-                  />
-                  <TargetTile
-                    label="Fat"
-                    value={formatNumber(targets.fat_g)}
-                    unit="g"
-                    color={MACRO_META.fat.color}
-                  />
-                  {targets.fiber_g ? (
-                    <TargetTile
-                      label="Fiber"
-                      value={formatNumber(targets.fiber_g)}
-                      unit="g"
-                      color={MACRO_META.fiber.color}
-                    />
-                  ) : null}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No targets set yet.</p>
-              )}
-              <RecomputeButton />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Uses the Mifflin-St Jeor equation with your activity factor, then adjusts for your goal.
-              </p>
-            </CardContent>
-          </Card>
-
-          {recentWeights.length > 0 ? (
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle className="text-base">Weight</CardTitle>
-                <CardDescription>
-                  {newest ? `Latest: ${Number(newest.weight_kg).toFixed(1)} kg` : "No entries"}
-                  {weightDelta != null ? (
-                    <span
-                      className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
-                      style={{
-                        backgroundColor:
-                          weightDelta < 0
-                            ? "color-mix(in oklch, var(--macro-protein) 15%, transparent)"
-                            : weightDelta > 0
-                              ? "color-mix(in oklch, var(--macro-calories) 15%, transparent)"
-                              : "var(--muted)",
-                        color:
-                          weightDelta < 0
-                            ? "var(--macro-protein)"
-                            : weightDelta > 0
-                              ? "var(--macro-calories)"
-                              : "var(--muted-foreground)",
-                      }}
-                    >
-                      {weightDelta < 0 ? (
-                        <TrendingDown className="size-3" aria-hidden />
-                      ) : weightDelta > 0 ? (
-                        <TrendingUp className="size-3" aria-hidden />
-                      ) : (
-                        <Minus className="size-3" aria-hidden />
-                      )}
-                      {weightDelta > 0 ? "+" : ""}
-                      {weightDelta.toFixed(1)} kg
-                    </span>
-                  ) : null}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="flex flex-col gap-1.5 text-sm">
-                  {recentWeights.slice(0, 5).map((w) => (
-                    <li
-                      key={w.id}
-                      className="flex items-center justify-between rounded-md px-2 py-1 text-sm hover:bg-accent/30"
-                    >
-                      <span className="text-muted-foreground">
-                        {new Date(w.logged_at).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                      <span className="font-medium tabular-nums">{Number(w.weight_kg).toFixed(1)} kg</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Ask NutriAI to log a weight — &ldquo;I&apos;m 72.4 kg today&rdquo;.
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
+    <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 animate-fade-in-up">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-ink">Profile</h1>
+          <p className="text-stone text-sm mt-1">Your metrics, preferences, and daily targets.</p>
         </div>
       </div>
-    </>
+
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        {/* Left column — Identity + BMI + Weight */}
+        <div className="flex flex-col gap-4">
+          {/* Identity card */}
+          <div className="bg-forest rounded-2xl p-6 text-white animate-fade-in-up">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex size-16 items-center justify-center rounded-full bg-white/10 text-2xl font-display font-bold">
+                {profile?.full_name?.[0]?.toUpperCase() ?? "U"}
+              </div>
+              <div>
+                <h2 className="font-display text-xl font-bold">{profile?.full_name ?? "User"}</h2>
+                <p className="text-white/60 text-sm">{user.email}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <StatTile label="Age" value={profile?.age ? `${profile.age}y` : "—"} />
+              <StatTile label="Sex" value={profile?.sex === "prefer_not_say" ? "—" : profile?.sex ?? "—"} />
+              <StatTile label="Height" value={profile?.height_cm ? `${profile.height_cm}cm` : "—"} />
+              <StatTile label="Weight" value={profile?.weight_kg ? `${profile.weight_kg}kg` : "—"} />
+            </div>
+          </div>
+
+          {/* BMI card */}
+          {bmi !== null && (
+            <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-3">Body Mass Index</p>
+              <div className="flex items-end gap-3 mb-3">
+                <span className="font-display text-3xl font-bold text-ink">{bmi.toFixed(1)}</span>
+                <span className={cn(
+                  "text-xs font-semibold px-2 py-0.5 rounded-full",
+                  bmiCategory === "Normal" ? "bg-mint2 text-sage" :
+                  bmiCategory === "Underweight" ? "bg-turmeric-l text-turmeric" :
+                  "bg-clay-l text-clay"
+                )}>
+                  {bmiCategory}
+                </span>
+              </div>
+              {/* BMI scale bar */}
+              <div className="relative h-2 rounded-full bg-gradient-to-r from-turmeric via-sage to-clay overflow-hidden">
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 size-4 rounded-full bg-white border-2 border-forest shadow-sm"
+                  style={{ left: `${Math.min(Math.max((bmi - 15) / 25 * 100, 0), 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-1 text-[10px] text-fog">
+                <span>15</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+              </div>
+            </div>
+          )}
+
+          {/* Weight tracker */}
+          {recentWeights.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-fog">Weight History</p>
+                {weightDelta != null && (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                    weightDelta < 0 ? "bg-mint2 text-sage" : weightDelta > 0 ? "bg-clay-l text-clay" : "bg-cream2 text-stone"
+                  )}>
+                    {weightDelta < 0 ? <TrendingDown className="size-3" /> : weightDelta > 0 ? <TrendingUp className="size-3" /> : <Minus className="size-3" />}
+                    {weightDelta > 0 ? "+" : ""}{weightDelta.toFixed(1)} kg
+                  </span>
+                )}
+              </div>
+              <ul className="space-y-1.5">
+                {recentWeights.slice(0, 5).map((w) => (
+                  <li key={w.id} className="flex items-center justify-between text-sm rounded-lg px-2 py-1 hover:bg-cream2/50 smooth-hover">
+                    <span className="text-stone">
+                      {new Date(w.logged_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                    <span className="font-display font-semibold tabular-nums text-ink">{Number(w.weight_kg).toFixed(1)} kg</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Right column — Targets + Preferences + Form */}
+        <div className="flex flex-col gap-4">
+          {/* Goal & Activity */}
+          <div className="grid grid-cols-2 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            <div className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="size-4 text-sage" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-fog">Goal</span>
+              </div>
+              <p className="font-display text-lg font-bold text-ink">
+                {profile?.goal ? goalLabels[profile.goal] : "Not set"}
+              </p>
+            </div>
+            <div className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="size-4 text-sage" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-fog">Activity</span>
+              </div>
+              <p className="font-display text-lg font-bold text-ink">
+                {profile?.activity_level ? activityLabels[profile.activity_level] : "Not set"}
+              </p>
+            </div>
+          </div>
+
+          {/* Daily targets */}
+          <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-fog">Daily Targets</p>
+              <RecomputeButton />
+            </div>
+            {targets ? (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <TargetTile label="Calories" value={formatNumber(targets.calories)} unit="kcal" icon={Flame} color="var(--macro-cal)" />
+                <TargetTile label="Protein" value={formatNumber(targets.protein_g)} unit="g" icon={Drumstick} color="var(--macro-protein)" />
+                <TargetTile label="Carbs" value={formatNumber(targets.carbs_g)} unit="g" icon={Wheat} color="var(--macro-carbs)" />
+                <TargetTile label="Fat" value={formatNumber(targets.fat_g)} unit="g" icon={Droplet} color="var(--macro-fat)" />
+                {targets.fiber_g && (
+                  <TargetTile label="Fiber" value={formatNumber(targets.fiber_g)} unit="g" icon={Salad} color="var(--macro-fiber)" />
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-stone">No targets set yet.</p>
+            )}
+            <p className="text-xs text-fog mt-3">
+              Uses the Mifflin-St Jeor equation with your activity factor, then adjusts for your goal.
+            </p>
+          </div>
+
+          {/* Preferences summary */}
+          <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-3">Preferences & Restrictions</p>
+            <div className="space-y-3">
+              {profile?.dietary_preferences?.length ? (
+                <TagRow label="Diet style" tags={profile.dietary_preferences} variant="green" />
+              ) : null}
+              {profile?.cuisines?.length ? (
+                <TagRow label="Cuisines" tags={profile.cuisines} variant="amber" />
+              ) : null}
+              {profile?.allergies?.length ? (
+                <TagRow label="Allergies" tags={profile.allergies} variant="red" />
+              ) : null}
+              {profile?.disliked_ingredients?.length ? (
+                <TagRow label="Dislikes" tags={profile.disliked_ingredients} variant="gray" />
+              ) : null}
+              {profile?.kitchen_appliances?.length ? (
+                <TagRow label="Appliances" tags={profile.kitchen_appliances} variant="blue" />
+              ) : null}
+            </div>
+          </div>
+
+          {/* Edit form */}
+          <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Pencil className="size-4 text-sage" />
+              <p className="text-sm font-semibold text-ink">Edit your info</p>
+            </div>
+            {profile ? <ProfileForm profile={profile} /> : <p className="text-stone text-sm">Profile not found.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white/10 rounded-xl px-3 py-2">
+      <p className="text-[10px] text-white/50 font-semibold uppercase tracking-wider">{label}</p>
+      <p className="font-display font-bold text-sm capitalize">{value}</p>
+    </div>
   )
 }
 
 function TargetTile({
-  label,
-  value,
-  unit,
-  color,
+  label, value, unit, icon: Icon, color,
 }: {
-  label: string
-  value: string
-  unit: string
-  color: string
+  label: string; value: string; unit: string; icon: typeof Flame; color: string
 }) {
   return (
-    <div
-      className="flex flex-col gap-0.5 rounded-lg border border-border px-3 py-2"
-      style={{ borderLeft: `3px solid ${color}` }}
-    >
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold tabular-nums">
-        {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+    <div className="flex flex-col gap-1 rounded-xl bg-cream2/50 px-3 py-2" style={{ borderLeft: `3px solid ${color}` }}>
+      <div className="flex items-center gap-1">
+        <Icon className="size-3" style={{ color }} />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-fog">{label}</span>
+      </div>
+      <span className="font-display text-base font-bold tabular-nums text-ink">
+        {value} <span className="text-xs font-normal font-sans text-fog">{unit}</span>
       </span>
+    </div>
+  )
+}
+
+function TagRow({ label, tags, variant }: { label: string; tags: string[]; variant: "green" | "amber" | "red" | "gray" | "blue" }) {
+  const styles = {
+    green: "bg-mint2 text-sage",
+    amber: "bg-turmeric-l text-turmeric",
+    red: "bg-clay-l text-clay",
+    gray: "bg-cream3 text-stone",
+    blue: "bg-blue-50 text-blue-600",
+  }
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-1.5">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((t) => (
+          <span key={t} className={cn("px-2.5 py-1 rounded-full text-xs font-medium capitalize", styles[variant])}>
+            {t}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

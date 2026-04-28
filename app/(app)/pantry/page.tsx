@@ -1,21 +1,15 @@
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
-import { PageHeader } from "@/components/page-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getAuthUser } from "@/lib/supabase/auth"
 import { Button } from "@/components/ui/button"
 import { PantryList } from "./pantry-list"
 import { PantrySummary } from "./pantry-summary"
-import { PantryRecipesButton } from "@/components/pantry-recipes-button"
-import { MessageCircle, Sparkles } from "lucide-react"
+import { MessageCircle, Plus, Search, Sparkles } from "lucide-react"
 import type { PantryItem } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
 export default async function PantryPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return null
 
   const { data: items } = await supabase
@@ -28,71 +22,47 @@ export default async function PantryPage() {
   const pantry = items ?? []
 
   return (
-    <>
-      <PageHeader
-        title="Pantry"
-        description="Every item with full nutrition — NutriAI uses this to plan your meals."
-        actions={
-          <Button asChild>
+    <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 animate-fade-in-up">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-ink">Pantry</h1>
+          <p className="text-stone text-sm mt-1">
+            Everything in your kitchen — NutriAI uses this to plan your meals.
+          </p>
+        </div>
+        <Button asChild className="gap-2 bg-forest hover:bg-sage text-white rounded-full px-5 w-fit">
+          <Link href="/chat">
+            <MessageCircle className="size-4" /> Add via chat
+          </Link>
+        </Button>
+      </div>
+
+      {/* Stats */}
+      {pantry.length > 0 && <PantrySummary items={pantry} />}
+
+      {/* CTA card */}
+      <div className="bg-card rounded-2xl border border-border p-5 mb-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-mint2 text-sage">
+            <Sparkles className="size-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-ink">Manage your pantry in chat</p>
+            <p className="text-sm text-stone mt-0.5">
+              Say &ldquo;add 1 kg rice, 1 L milk and 2 dozen eggs&rdquo; — nutrition, categories, and expiry are filled automatically.
+            </p>
+          </div>
+          <Button asChild className="gap-2 bg-forest hover:bg-sage text-white rounded-full px-5 w-fit shrink-0">
             <Link href="/chat">
-              <MessageCircle className="mr-2 size-4" /> Add via chat
+              <MessageCircle className="size-4" /> Start a pantry chat
             </Link>
           </Button>
-        }
-      />
-
-      <div className="flex flex-col gap-6 p-4 md:p-8">
-        {/* Nutrition snapshot */}
-        {pantry.length > 0 ? <PantrySummary items={pantry} /> : null}
-
-        {/* Pantry → Recipe bridge */}
-        <PantryRecipesButton itemCount={pantry.length} />
-
-        {/* CTA banner */}
-        <Card className="relative overflow-hidden border-primary/30">
-          <div
-            className="absolute inset-0 opacity-[0.08]"
-            style={{
-              background:
-                "radial-gradient(circle at 80% 20%, oklch(0.78 0.16 140) 0, transparent 40%), radial-gradient(circle at 20% 80%, oklch(0.82 0.13 80) 0, transparent 40%)",
-            }}
-            aria-hidden
-          />
-          <CardHeader className="relative">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                  <Sparkles className="size-5" />
-                </div>
-                <div>
-                  <CardTitle>Manage your pantry in chat</CardTitle>
-                  <CardDescription className="mt-0.5">
-                    Say &ldquo;add 1 kg rice, 1 L milk and 2 dozen eggs&rdquo; — nutrition, categories, units and expiry are filled in automatically.
-                  </CardDescription>
-                </div>
-              </div>
-              <Button asChild>
-                <Link href="/chat">
-                  <MessageCircle className="mr-2 size-4" /> Start a pantry chat
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {/* Items by category */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Everything in your pantry</CardTitle>
-            <CardDescription>
-              Tap any item to see its detailed macros. Use the chat to edit or rename quickly.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PantryList items={pantry} />
-          </CardContent>
-        </Card>
+        </div>
       </div>
-    </>
+
+      {/* Items grid */}
+      <PantryList items={pantry} />
+    </div>
   )
 }

@@ -1,31 +1,31 @@
 import Link from "next/link"
-import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ShoppingBag, Link2, MessageCircle } from "lucide-react"
 import { getSwiggyAdapter } from "@/lib/swiggy/adapter"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/auth"
 
 export const dynamic = "force-dynamic"
 
 export default async function SwiggyPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { user } = await getAuthUser()
   if (!user) return null
 
   const adapter = getSwiggyAdapter()
   const status = await adapter.getConnectionStatus(user.id)
 
   return (
-    <>
-      <PageHeader
-        title="Swiggy"
-        description="Order meals that fit your remaining macros, without leaving NutriAI."
-      />
-      <div className="flex flex-col gap-4 p-4 md:p-8">
+    <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-8">
+      {/* Header */}
+      <div className="mb-6 animate-fade-in-up">
+        <h1 className="font-display text-3xl font-bold text-ink">Swiggy</h1>
+        <p className="text-stone text-sm mt-1">
+          Order meals that fit your remaining macros, without leaving NutriAI.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4">
         {!adapter.isConfigured ? (
           <Alert>
             <Link2 className="size-4" />
@@ -37,10 +37,10 @@ export default async function SwiggyPage() {
           </Alert>
         ) : null}
 
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader className="flex flex-row items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ShoppingBag className="size-5" aria-hidden />
+            <span className="flex size-10 items-center justify-center rounded-xl bg-mint2 text-sage">
+              <ShoppingBag className="size-5" />
             </span>
             <div>
               <CardTitle>Connection</CardTitle>
@@ -53,18 +53,18 @@ export default async function SwiggyPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {status.connected ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-stone">
                 Ask NutriAI in chat to find meals that match your remaining macros, and we&apos;ll queue the Swiggy
                 order for you to approve.
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-stone">
                 Connect your Swiggy account to order directly from chat. Your AI dietitian will filter menus by your
                 allergies and remaining macros.
               </p>
             )}
             <div className="flex gap-2">
-              <Button asChild disabled={!adapter.isConfigured}>
+              <Button asChild disabled={!adapter.isConfigured} className="bg-forest hover:bg-sage text-white rounded-full">
                 <Link href="/chat">
                   <MessageCircle className="mr-2 size-4" /> Plan an order in chat
                 </Link>
@@ -73,6 +73,6 @@ export default async function SwiggyPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   )
 }
