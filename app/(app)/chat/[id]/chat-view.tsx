@@ -382,7 +382,7 @@ function MessageBubble({
           }
 
           // Skip non-visible parts
-          if (part.type === "reasoning" || part.type === "step-start" || part.type === "source") return null
+          if (part.type === "reasoning" || part.type === "step-start" || (part.type as string) === "source") return null
 
           // Tool invocation parts — handle both AI SDK v5 ("tool-invocation") and v6 ("tool-{name}") formats
           if (part.type === "tool-invocation" || (part.type.startsWith("tool-") && part.type !== "tool-invocation")) {

@@ -55,11 +55,11 @@ class SessionManager {
     try {
       const supabase = createClient()
       const {
-        data: { user, session },
+        data: { session },
       } = await supabase.auth.getSession()
 
       const result: CachedSession = {
-        user,
+        user: session?.user ?? null,
         session,
         timestamp: now,
       }

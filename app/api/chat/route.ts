@@ -1,10 +1,10 @@
 import { convertToModelMessages, generateText, stepCountIs, streamText, type UIMessage } from "ai"
-import { google } from "@ai-sdk/google"
+import { nimChatModel } from "@/lib/ai/nim-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { buildTools } from "@/lib/ai/tools"
 import { buildSystemPrompt } from "@/lib/ai/system-prompt"
-import { extractAndStoreMemories, retrieveMemories } from "@/lib/ai/memory"
+import { retrieveMemories } from "@/lib/ai/memory"
 import type { NutritionTargets, Profile } from "@/lib/types"
 import { sumTotals } from "@/lib/nutrition"
 import { computeStreakInfo } from "@/lib/streaks"
@@ -18,9 +18,7 @@ export const runtime = "nodejs"
 async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
   try {
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
-      // Disable thinking so titles are instant and deterministic.
-      providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+      model: nimChatModel,
       maxOutputTokens: 32,
       prompt:
         "Create a short, specific chat title (3 to 6 words, no quotes, no punctuation at the end, Title Case). " +
@@ -169,13 +167,8 @@ export async function POST(req: Request) {
   const tools = buildTools(supabase, user.id)
 
   const result = streamText({
-    // Gemini 2.5 Flash: free-tier friendly, fast, supports tools + streaming.
-    // We explicitly disable "thinking" tokens because they share the output budget
-    // with the visible response and were causing mid-sentence truncation when
-    // combined with tool calls.
-    model: google("gemini-2.5-flash"),
-    providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
-    // Give the model enough room to finish a long answer with multiple tool calls.
+    // NVIDIA NIM: Llama 3.3 70B Instruct — native tool calling, fast, reliable.
+    model: nimChatModel,
     maxOutputTokens: 4096,
     system,
     messages: await convertToModelMessages(messages),
@@ -184,9 +177,8 @@ export async function POST(req: Request) {
     onError: ({ error }) => {
       console.log("[chat] streamText error:", error)
     },
-    onStepFinish: ({ toolCalls, toolResults, text, stepType }) => {
+    onStepFinish: ({ toolCalls, toolResults, text }) => {
       console.log("[chat] step finished:", {
-        stepType,
         textLength: text?.length ?? 0,
         toolCalls: toolCalls?.map((tc: any) => ({ name: tc.toolName, id: tc.toolCallId })),
         toolResults: toolResults?.map((tr: any) => ({ name: tr.toolName, id: tr.toolCallId, hasResult: !!tr.result })),
@@ -236,19 +228,8 @@ export async function POST(req: Request) {
         }
         await supabase.from("conversations").update(convoUpdate).eq("id", conversationId)
 
-        // Fire-and-forget: extract durable facts from this exchange into the memories table.
-        // OPTIMIZED: Only extracts ~10% of interactions using intelligent triggering
-        if (lastUserText || assistantText) {
-          void extractAndStoreMemories({
-            userId: user.id,
-            userText: lastUserText,
-            assistantText,
-            conversationId,
-            messageCount: finishedMessages.length,
-            lastExtractionTime: null, // TODO: fetch from DB/cache
-            recentMessages: finishedMessages as any,
-          })
-        }
+        // Memory extraction is now handled by the deferred cron job
+        // (POST /api/cron/extract-memories) — no inline extraction here.
       } catch (e) {
         console.log("[v0] Failed to persist messages", e)
       }
