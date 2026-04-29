@@ -1,14 +1,12 @@
 import Link from "next/link"
 import { getAuthUser } from "@/lib/supabase/auth"
-import { Button } from "@/components/ui/button"
-import { ProfileForm } from "./profile-form"
+import { ProfileSections } from "./profile-sections"
 import { RecomputeButton } from "./recompute-button"
 import { formatNumber } from "@/lib/format"
-import { MACRO_META } from "@/lib/macro-colors"
 import type { NutritionTargets, Profile, WeightLog } from "@/lib/types"
 import {
-  User, Activity, Target, Heart, ChefHat, Scale,
-  TrendingDown, TrendingUp, Minus, Pencil, Flame, Drumstick, Wheat, Droplet, Salad,
+  Activity, Target, Scale,
+  TrendingDown, TrendingUp, Minus, Flame, Drumstick, Wheat, Droplet, Salad,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -116,7 +114,6 @@ export default async function ProfilePage() {
                   {bmiCategory}
                 </span>
               </div>
-              {/* BMI scale bar */}
               <div className="relative h-2 rounded-full bg-gradient-to-r from-turmeric via-sage to-clay overflow-hidden">
                 <div
                   className="absolute top-1/2 -translate-y-1/2 size-4 rounded-full bg-white border-2 border-forest shadow-sm"
@@ -158,7 +155,7 @@ export default async function ProfilePage() {
           )}
         </div>
 
-        {/* Right column — Targets + Preferences + Form */}
+        {/* Right column — Targets + Editable Sections */}
         <div className="flex flex-col gap-4">
           {/* Goal & Activity */}
           <div className="grid grid-cols-2 gap-3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
@@ -206,36 +203,12 @@ export default async function ProfilePage() {
             </p>
           </div>
 
-          {/* Preferences summary */}
-          <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-3">Preferences & Restrictions</p>
-            <div className="space-y-3">
-              {profile?.dietary_preferences?.length ? (
-                <TagRow label="Diet style" tags={profile.dietary_preferences} variant="green" />
-              ) : null}
-              {profile?.cuisines?.length ? (
-                <TagRow label="Cuisines" tags={profile.cuisines} variant="amber" />
-              ) : null}
-              {profile?.allergies?.length ? (
-                <TagRow label="Allergies" tags={profile.allergies} variant="red" />
-              ) : null}
-              {profile?.disliked_ingredients?.length ? (
-                <TagRow label="Dislikes" tags={profile.disliked_ingredients} variant="gray" />
-              ) : null}
-              {profile?.kitchen_appliances?.length ? (
-                <TagRow label="Appliances" tags={profile.kitchen_appliances} variant="blue" />
-              ) : null}
+          {/* Sectioned editable profile — client component with view/edit toggle per section */}
+          {profile ? <ProfileSections profile={profile} /> : (
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <p className="text-stone text-sm">Profile not found. Please set up your profile.</p>
             </div>
-          </div>
-
-          {/* Edit form */}
-          <div className="bg-card rounded-2xl border border-border p-5 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Pencil className="size-4 text-sage" />
-              <p className="text-sm font-semibold text-ink">Edit your info</p>
-            </div>
-            {profile ? <ProfileForm profile={profile} /> : <p className="text-stone text-sm">Profile not found.</p>}
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -265,28 +238,6 @@ function TargetTile({
       <span className="font-display text-base font-bold tabular-nums text-ink">
         {value} <span className="text-xs font-normal font-sans text-fog">{unit}</span>
       </span>
-    </div>
-  )
-}
-
-function TagRow({ label, tags, variant }: { label: string; tags: string[]; variant: "green" | "amber" | "red" | "gray" | "blue" }) {
-  const styles = {
-    green: "bg-mint2 text-sage",
-    amber: "bg-turmeric-l text-turmeric",
-    red: "bg-clay-l text-clay",
-    gray: "bg-cream3 text-stone",
-    blue: "bg-blue-50 text-blue-600",
-  }
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-1.5">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((t) => (
-          <span key={t} className={cn("px-2.5 py-1 rounded-full text-xs font-medium capitalize", styles[variant])}>
-            {t}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }

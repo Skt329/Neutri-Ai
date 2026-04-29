@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -9,7 +9,26 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,39 +112,46 @@ export function ChatView({
   const [input, setInput] = useState("")
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
   const [showScrollDown, setShowScrollDown] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState(title ?? "")
+  const [actionPending, setActionPending] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const isAutoScrollingRef = useRef(false)
+  const scrollRafRef = useRef<number | null>(null)
 
-  // Smart auto-scroll: only scroll if user is near bottom
+  // Smart auto-scroll: batched with rAF to prevent jank during streaming
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-    if (isNearBottom) {
-      el.scrollTop = el.scrollHeight
-    } else {
-      setShowScrollDown(true)
-    }
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const el = scrollRef.current
+      if (!el) return
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150
+      if (isNearBottom) {
+        isAutoScrollingRef.current = true
+        el.scrollTop = el.scrollHeight
+        // Clear auto-scroll flag after browser processes the scroll
+        requestAnimationFrame(() => { isAutoScrollingRef.current = false })
+      } else {
+        setShowScrollDown(true)
+      }
+    })
+    return () => { if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current) }
   }, [messages, status])
 
-  // Track scroll position for "new messages" indicator
+  // Track scroll position — ignores programmatic auto-scrolls
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     function onScroll() {
-      const nearBottom = el!.scrollHeight - el!.scrollTop - el!.clientHeight < 120
+      if (isAutoScrollingRef.current) return
+      const nearBottom = el!.scrollHeight - el!.scrollTop - el!.clientHeight < 150
       setShowScrollDown(!nearBottom)
     }
     el.addEventListener("scroll", onScroll, { passive: true })
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
-
-  // Track failed sends for retry
-  useEffect(() => {
-    if (error && status === "error") {
-      // error occurred — keep lastFailedInput for retry
-    }
-  }, [error, status])
 
   useEffect(() => {
     if (prefillHandled.current) return
@@ -142,7 +168,6 @@ export function ChatView({
   // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      // Escape to stop streaming
       if (e.key === "Escape" && (status === "streaming" || status === "submitted")) {
         e.preventDefault()
         stop()
@@ -155,18 +180,16 @@ export function ChatView({
   const isStreaming = status === "streaming" || status === "submitted"
   const isEmpty = messages.length === 0
 
-  function sendText(text: string) {
-    if (!text.trim() || isStreaming) return
+  const sendText = useCallback((text: string) => {
+    if (!text.trim() || status === "streaming" || status === "submitted") return
     setLastFailedInput(text)
     setInput("")
-    // Reset textarea height
     if (textareaRef.current) textareaRef.current.style.height = "auto"
     sendMessage({ text })
-  }
+  }, [status, sendMessage])
 
   function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value)
-    // Auto-resize textarea
     const el = e.target
     el.style.height = "auto"
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
@@ -180,32 +203,35 @@ export function ChatView({
   function scrollToBottom() {
     const el = scrollRef.current
     if (el) {
+      isAutoScrollingRef.current = true
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
       setShowScrollDown(false)
+      setTimeout(() => { isAutoScrollingRef.current = false }, 500)
     }
   }
 
-  async function onRename() {
-    const next = window.prompt("Rename chat", title ?? "")
-    if (next == null) return
+  async function handleRename() {
+    const clean = renameValue.trim().slice(0, 120)
+    if (!clean) return
+    setActionPending(true)
     try {
-
-      await renameConversation(conversationId, next)
+      await renameConversation(conversationId, clean)
       router.refresh()
+      setRenameOpen(false)
     } catch (e) {
-
       toast.error(e instanceof Error ? e.message : "Rename failed")
+    } finally {
+      setActionPending(false)
     }
   }
 
-  async function onDelete() {
-    if (!window.confirm("Delete this chat? This cannot be undone.")) return
+  async function handleDelete() {
+    setActionPending(true)
     try {
-
       await deleteConversation(conversationId)
     } catch (e) {
-
       toast.error(e instanceof Error ? e.message : "Delete failed")
+      setActionPending(false)
     }
   }
 
@@ -228,10 +254,10 @@ export function ChatView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onRename}>
+            <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-clay focus:text-clay">
+            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
               <Trash2 className="mr-2 size-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -256,51 +282,53 @@ export function ChatView({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onRename}>
+            <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-clay focus:text-clay">
+            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
               <Trash2 className="mr-2 size-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
-          {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
-          {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} addToolOutput={addToolOutput} isStreaming={status === "streaming"} isLast={m === messages[messages.length - 1]} />
-          ))}
-          {status === "submitted" ? (
-            <div className="flex items-center gap-2 text-sm text-stone animate-fade-in">
-              <Spinner className="size-4" /> Thinking…
-            </div>
-          ) : null}
-          {error && status === "error" ? (
-            <div className="flex items-center gap-3 rounded-xl border border-clay/30 bg-clay/5 px-4 py-3 text-sm text-clay animate-fade-in">
-              <AlertCircle className="size-4 shrink-0" />
-              <span className="flex-1">Failed to get a response. Check your connection and try again.</span>
-              {lastFailedInput ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 border-clay/30 text-clay hover:bg-clay/10"
-                  onClick={() => sendText(lastFailedInput)}
-                >
-                  Retry
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
+      {/* Messages area — indicator is OUTSIDE scroll container */}
+      <div className="relative flex-1 min-h-0">
+        <div ref={scrollRef} className="h-full overflow-y-auto" style={{ contentVisibility: 'auto' }}>
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
+            {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
+            {messages.map((m, idx) => (
+              <MemoizedMessageBubble key={m.id} message={m} addToolOutput={addToolOutput} isStreaming={status === "streaming"} isLast={idx === messages.length - 1} />
+            ))}
+            {status === "submitted" ? (
+              <div className="flex items-center gap-2 text-sm text-stone animate-fade-in">
+                <Spinner className="size-4" /> Thinking…
+              </div>
+            ) : null}
+            {error && status === "error" ? (
+              <div className="flex items-center gap-3 rounded-xl border border-clay/30 bg-clay/5 px-4 py-3 text-sm text-clay animate-fade-in">
+                <AlertCircle className="size-4 shrink-0" />
+                <span className="flex-1">Failed to get a response. Check your connection and try again.</span>
+                {lastFailedInput ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-clay/30 text-clay hover:bg-clay/10"
+                    onClick={() => sendText(lastFailedInput)}
+                  >
+                    Retry
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {/* Scroll-to-bottom indicator */}
+        {/* Scroll-to-bottom — positioned relative to the wrapper, NOT inside scroll */}
         {showScrollDown && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-forest/90 text-white px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-sm hover:bg-forest smooth-hover animate-fade-in"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-forest/90 text-white px-4 py-2 text-xs font-medium shadow-lg backdrop-blur-sm hover:bg-forest smooth-hover animate-fade-in"
             aria-label="Scroll to latest messages"
           >
             <ArrowDown className="size-3" /> New messages
@@ -355,6 +383,48 @@ export function ChatView({
           )}
         </div>
       </form>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename conversation</DialogTitle>
+            <DialogDescription>Give this chat a descriptive name.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="Chat name…"
+            maxLength={120}
+            onKeyDown={(e) => { if (e.key === "Enter") handleRename() }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={actionPending}>Cancel</Button>
+            <Button onClick={handleRename} disabled={actionPending || !renameValue.trim()} className="bg-forest hover:bg-sage text-white">
+              {actionPending ? <><Spinner className="size-4 mr-1" /> Saving…</> : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this chat and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={actionPending} className="bg-clay hover:bg-clay/90 text-white">
+              {actionPending ? <><Spinner className="size-4 mr-1" /> Deleting…</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -402,7 +472,7 @@ function Suggestions({ onPick }: { onPick: (text: string) => void }) {
   )
 }
 
-/* ── Message Bubble ── */
+/* ── Message Bubble (memoized to prevent re-renders during streaming) ── */
 function MessageBubble({
   message,
   addToolOutput,
@@ -517,6 +587,16 @@ function MessageBubble({
     </div>
   )
 }
+
+const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
+  if (prev.message.id !== next.message.id) return false
+  if (prev.isLast !== next.isLast) return false
+  if (prev.isStreaming !== next.isStreaming) return false
+  // During streaming, the last message changes per token — must re-render
+  if (next.isLast && next.isStreaming) return false
+  if (prev.message.parts.length !== next.message.parts.length) return false
+  return true
+})
 
 /* ── Tool types and renderers ── */
 type ToolUIPart = {
