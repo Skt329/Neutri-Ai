@@ -104,37 +104,53 @@ async function processConversation(
     return 0
   }
 
-  // 3. Dedup against existing memories (vector-based would be ideal, but
-  //    for now use simple text matching to avoid extra embed calls)
-  const { data: existing } = await admin
-    .from("memories")
-    .select("content")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50)
+  // 3. Batch embed ALL extracted memories in 1 API call (we need embeddings
+  //    for both dedup and storage, so do this before filtering)
+  const embeddings = await nimEmbedBatch(memories, "passage")
 
-  const existingSet = new Set(
-    (existing ?? []).map((m) => m.content.toLowerCase().trim()),
-  )
-  const uniqueMemories = memories.filter(
-    (m) => !existingSet.has(m.toLowerCase().trim()),
-  )
+  // 4. Semantic dedup — check each new memory's embedding against existing
+  //    memories via cosine similarity. Skip if similarity > 0.92 (paraphrases).
+  //    This catches "lactose intolerant" vs "cannot digest dairy" that text
+  //    matching would miss.
+  const SIMILARITY_THRESHOLD = 0.92
+  const dedupedMemories: Array<{ content: string; embedding: number[] }> = []
 
-  if (uniqueMemories.length === 0) {
-    console.log(`[cron/extract-memories] ${conversationId}: all ${memories.length} memories were duplicates`)
+  for (let i = 0; i < memories.length; i++) {
+    const embedding = embeddings[i]
+    const content = memories[i]
+
+    // Check against existing stored memories using vector similarity
+    const { data: matches } = await admin.rpc("match_memories_for_user", {
+      p_user_id: userId,
+      query_embedding: JSON.stringify(embedding),
+      match_count: 1,
+      similarity_threshold: SIMILARITY_THRESHOLD,
+    })
+
+    if (matches && matches.length > 0) {
+      // A semantically similar memory already exists — skip
+      console.log(
+        `[cron/extract-memories] Skipping semantic duplicate: "${content.slice(0, 60)}..." ` +
+        `(similar to: "${matches[0].content.slice(0, 60)}...", score: ${matches[0].similarity.toFixed(3)})`,
+      )
+      continue
+    }
+
+    dedupedMemories.push({ content, embedding })
+  }
+
+  if (dedupedMemories.length === 0) {
+    console.log(`[cron/extract-memories] ${conversationId}: all ${memories.length} memories were semantic duplicates`)
     await admin.rpc("mark_conversation_extracted", { p_conversation_id: conversationId })
     return 0
   }
 
-  // 4. Batch embed ALL unique memories in 1 API call
-  const embeddings = await nimEmbedBatch(uniqueMemories, "passage")
-
-  // 5. Bulk insert
-  const rows = uniqueMemories.map((content, i) => ({
+  // 5. Bulk insert deduplicated memories with their embeddings
+  const rows = dedupedMemories.map(({ content, embedding }) => ({
     user_id: userId,
     source: "chat" as const,
     content,
-    embedding: embeddings[i],
+    embedding,
   }))
 
   const { error: insertErr } = await admin.from("memories").insert(rows)
@@ -146,8 +162,11 @@ async function processConversation(
   // 6. Mark conversation as extracted
   await admin.rpc("mark_conversation_extracted", { p_conversation_id: conversationId })
 
-  console.log(`[cron/extract-memories] ${conversationId}: extracted ${uniqueMemories.length} new memories`)
-  return uniqueMemories.length
+  console.log(
+    `[cron/extract-memories] ${conversationId}: extracted ${dedupedMemories.length} new memories ` +
+    `(${memories.length - dedupedMemories.length} semantic duplicates skipped)`,
+  )
+  return dedupedMemories.length
 }
 
 /**

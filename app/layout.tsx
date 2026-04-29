@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next"
 import { Plus_Jakarta_Sans, Fraunces } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/sonner"
-import { PostHogProvider } from "@/components/posthog-provider"
 import "./globals.css"
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -46,12 +45,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plusJakarta.variable} ${fraunces.variable}`}>
       <body className="font-sans antialiased bg-background text-foreground">
-        <PostHogProvider>
-          {children}
-        </PostHogProvider>
+        {children}
         <Toaster richColors closeButton />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
   )
 }
+

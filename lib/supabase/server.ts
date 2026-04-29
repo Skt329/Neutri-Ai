@@ -19,14 +19,3 @@ export async function createClient() {
     },
   })
 }
-
-/**
- * Service-role client for privileged server-side operations (tool-calls, webhooks).
- * NEVER import this into a Client Component.
- */
-export function createAdminClient() {
-  const { createClient: createAdmin } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js")
-  return createAdmin(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}

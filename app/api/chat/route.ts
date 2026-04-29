@@ -15,6 +15,26 @@ import { computeMealGap } from "@/lib/meal-gaps"
 // ConnectTimeoutError on slow/intermittent connections.
 export const runtime = "nodejs"
 
+// ── Rate limiting (in-memory sliding window for serverless) ──────────
+// Keyed by userId → array of timestamps. Cleaned up per-request.
+const rateLimitMap = new Map<string, number[]>()
+const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute
+const RATE_LIMIT_MAX = 20 // max 20 requests per minute per user
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now()
+  const timestamps = rateLimitMap.get(userId) ?? []
+  // Remove entries older than the window
+  const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+  if (valid.length >= RATE_LIMIT_MAX) {
+    rateLimitMap.set(userId, valid)
+    return false // rate limited
+  }
+  valid.push(now)
+  rateLimitMap.set(userId, valid)
+  return true
+}
+
 async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
   try {
     const { text } = await generateText({
@@ -67,6 +87,14 @@ export async function POST(req: Request) {
     }
   }
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // ── Rate limit check ──
+  if (!checkRateLimit(user.id)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a moment before sending another message." },
+      { status: 429 },
+    )
+  }
 
   const body = (await req.json()) as { messages: UIMessage[]; conversationId: string }
   const { messages, conversationId } = body
@@ -174,8 +202,17 @@ export async function POST(req: Request) {
     messages: await convertToModelMessages(messages),
     tools,
     stopWhen: stepCountIs(12),
+    // Vercel AI SDK built-in telemetry (OpenTelemetry compatible)
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "neutri-chat",
+      metadata: {
+        userId: user.id,
+        conversationId,
+      },
+    },
     onError: ({ error }) => {
-      console.log("[chat] streamText error:", error)
+      console.error("[chat] streamText error:", error)
     },
     onStepFinish: ({ toolCalls, toolResults, text }) => {
       console.log("[chat] step finished:", {
@@ -189,49 +226,61 @@ export async function POST(req: Request) {
   return result.toUIMessageStreamResponse({
     originalMessages: messages,
     async onFinish({ messages: finishedMessages }) {
-      // DEBUG: log what the model produced
       console.log("[chat] onFinish — message count:", finishedMessages.length)
-      for (const m of finishedMessages) {
-        console.log(`[chat]   role=${m.role}, parts=${m.parts.length}:`, m.parts.map((p: any) => ({
-          type: p.type,
-          text: p.type === "text" ? p.text?.substring(0, 80) : undefined,
-          toolName: p.toolInvocation?.toolName ?? p.toolName,
-          state: p.toolInvocation?.state ?? p.state,
-        })))
-      }
+
       try {
-        // Persist the last user message + all new assistant/tool messages.
-        // We rewrite the full conversation messages list for simplicity (small volumes here).
-        await supabase.from("messages").delete().eq("conversation_id", conversationId)
-        const rows = finishedMessages.map((m) => ({
-          conversation_id: conversationId,
-          user_id: user.id,
-          role: m.role,
-          parts: m.parts as unknown,
-        }))
-        if (rows.length > 0) {
-          await supabase.from("messages").insert(rows)
-        }
-        const assistantText = finishedMessages
-          .filter((m) => m.role === "assistant")
-          .map((m) => messageToText(m))
-          .join("\n")
-          .trim()
+        // ── Append-only message persistence ──
+        // Only insert messages that don't already exist in the DB.
+        // We query existing message count and insert only the delta.
+        const { count: existingCount } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", conversationId)
 
-        // Auto-generate a title on the first successful exchange, like ChatGPT/Claude.
-        const convoUpdate: { updated_at: string; title?: string } = {
-          updated_at: new Date().toISOString(),
-        }
-        if (!existingTitle && (lastUserText || assistantText)) {
-          const title = await generateConversationTitle(lastUserText, assistantText)
-          if (title) convoUpdate.title = title
-        }
-        await supabase.from("conversations").update(convoUpdate).eq("id", conversationId)
+        const savedCount = existingCount ?? 0
+        const newMessages = finishedMessages.slice(savedCount)
 
-        // Memory extraction is now handled by the deferred cron job
+        if (newMessages.length > 0) {
+          const rows = newMessages.map((m) => ({
+            conversation_id: conversationId,
+            user_id: user.id,
+            role: m.role,
+            parts: m.parts as unknown,
+          }))
+          const { error: insertErr } = await supabase.from("messages").insert(rows)
+          if (insertErr) {
+            console.error("[chat] Failed to insert new messages:", insertErr.message)
+          }
+        }
+
+        // ── Update conversation timestamp ──
+        await supabase
+          .from("conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", conversationId)
+
+        // ── Fire-and-forget title generation (non-blocking) ──
+        if (!existingTitle) {
+          const assistantText = finishedMessages
+            .filter((m) => m.role === "assistant")
+            .map((m) => messageToText(m))
+            .join("\n")
+            .trim()
+
+          if (lastUserText || assistantText) {
+            // Don't await — let it run in the background
+            generateConversationTitle(lastUserText, assistantText).then((title) => {
+              if (title) {
+                supabase.from("conversations").update({ title }).eq("id", conversationId).then(() => {})
+              }
+            }).catch(() => {})
+          }
+        }
+
+        // Memory extraction is handled by the deferred cron job
         // (POST /api/cron/extract-memories) — no inline extraction here.
       } catch (e) {
-        console.log("[v0] Failed to persist messages", e)
+        console.error("[chat] Failed to persist messages:", e)
       }
     },
   })

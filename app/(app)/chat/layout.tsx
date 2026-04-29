@@ -7,39 +7,39 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   const { user, supabase } = await getAuthUser()
   if (!user) return <>{children}</>
 
-  const [{ data: convos }, { data: profile }] = await Promise.all([
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+
+  const [{ data: convos }, { data: profile }, { data: mealDates }] = await Promise.all([
     supabase
       .from('conversations')
       .select('id, title, updated_at')
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false }),
+      .order('updated_at', { ascending: false })
+      .limit(50),
     supabase
       .from('profiles')
       .select('full_name')
       .eq('id', user.id)
       .maybeSingle(),
-  ])
-
-  // Compute streak with a SINGLE query instead of 30 sequential ones.
-  let streakDays = 0
-  try {
-    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
-    const { data: mealDates } = await supabase
+    supabase
       .from('meal_logs')
       .select('logged_at')
       .eq('user_id', user.id)
       .gte('logged_at', since)
       .order('logged_at', { ascending: false })
+      .limit(200),
+  ])
 
+  // Compute streak from the already-fetched meal dates
+  let streakDays = 0
+  try {
     if (mealDates && mealDates.length > 0) {
-      // Build a Set of unique date strings (YYYY-MM-DD)
       const loggedDays = new Set(
         mealDates.map((m) => {
           const d = new Date(m.logged_at)
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
         })
       )
-      // Count consecutive days backwards from today
       const now = new Date()
       for (let d = 0; d < 30; d++) {
         const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d)

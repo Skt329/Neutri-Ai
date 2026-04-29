@@ -20,7 +20,7 @@ import { ArrowLeft, MoreVertical, Send, Trash2, Pencil, Leaf, User, Wrench, Spar
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
 import { cn } from "@/lib/utils"
-import { trackEvent, trackError } from "@/lib/posthog"
+
 import {
   AskUserCard,
   ChooseOptionCard,
@@ -127,10 +127,7 @@ export function ChatView({
     if (!text.trim() || disabled) return
     setLastFailedInput(text)
     setInput("")
-    trackEvent("chat_message_sent", {
-      conversation_id: conversationId,
-      message_length: text.length,
-    })
+
     sendMessage({ text })
   }
 
@@ -143,11 +140,11 @@ export function ChatView({
     const next = window.prompt("Rename chat", title ?? "")
     if (next == null) return
     try {
-      trackEvent("chat_renamed", { conversation_id: conversationId, new_title: next })
+
       await renameConversation(conversationId, next)
       router.refresh()
     } catch (e) {
-      trackError(e instanceof Error ? e : new Error("Rename failed"))
+
       toast.error(e instanceof Error ? e.message : "Rename failed")
     }
   }
@@ -155,10 +152,10 @@ export function ChatView({
   async function onDelete() {
     if (!window.confirm("Delete this chat? This cannot be undone.")) return
     try {
-      trackEvent("chat_deleted", { conversation_id: conversationId })
+
       await deleteConversation(conversationId)
     } catch (e) {
-      trackError(e instanceof Error ? e : new Error("Delete failed"))
+
       toast.error(e instanceof Error ? e.message : "Delete failed")
     }
   }
@@ -471,7 +468,7 @@ function ClientToolRenderer({
   const output = hasOutput ? (part.output as unknown) : null
 
   const submit = (value: unknown) => {
-    trackEvent("tool_executed", { tool_name: toolName, tool_call_id: part.toolCallId })
+
     addToolOutput({ tool: toolName, toolCallId: part.toolCallId, output: value })
   }
 

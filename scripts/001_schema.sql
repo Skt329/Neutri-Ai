@@ -211,8 +211,9 @@ CREATE TABLE IF NOT EXISTS public.memories (
 
 CREATE INDEX IF NOT EXISTS memories_user_idx ON public.memories(user_id, created_at DESC);
 
+-- HNSW index works well at any data size (unlike ivfflat which needs 10K+ rows)
 CREATE INDEX IF NOT EXISTS memories_embedding_idx
-  ON public.memories USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+  ON public.memories USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 ALTER TABLE public.memories ENABLE ROW LEVEL SECURITY;
 
