@@ -48,11 +48,58 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   if (!convoRes.data) notFound()
 
-  const initial: UIMessage[] = (msgsRes.data ?? []).map((r) => ({
-    id: r.id,
-    role: r.role as UIMessage["role"],
-    parts: (r.parts as UIMessage["parts"]) ?? [],
-  }))
+  // ── Reconstruct UIMessages with resolved client tool outputs ──
+  // Client tools (propose_meal_log, ask_user, etc.) are saved to DB with
+  // state "call" and no output because the user's confirmation was sent as
+  // a separate auto-round-trip. On reload, this would render them as
+  // interactive forms again. Fix: if a client tool part appears in any
+  // message that is NOT the last one, the user already responded — we
+  // synthesize a default "confirmed" output so the card is read-only.
+  const CLIENT_TOOLS = ["propose_meal_log", "ask_user", "choose_option", "propose_pantry_items"]
+  const rawMessages = msgsRes.data ?? []
+
+  const initial: UIMessage[] = rawMessages.map((r, msgIndex) => {
+    const parts = (r.parts as any[]) ?? []
+    const isLastMessage = msgIndex === rawMessages.length - 1
+
+    const fixedParts = parts.map((part: any) => {
+      // Only process tool invocation parts for client tools
+      const inv = part.toolInvocation ?? part
+      const toolName: string | undefined =
+        inv.toolName ??
+        (typeof part.type === "string" && part.type.startsWith("tool-") && part.type !== "tool-invocation"
+          ? part.type.replace(/^tool-/, "")
+          : undefined)
+
+      if (!toolName || !CLIENT_TOOLS.includes(toolName)) return part
+
+      // Already has output → no fix needed
+      const hasOutput = inv.state === "result" || inv.state === "output-available" || inv.result !== undefined || inv.output !== undefined
+      if (hasOutput) return part
+
+      // If this is NOT the last message, subsequent messages exist →
+      // the user already confirmed this tool call. Synthesize output.
+      if (!isLastMessage) {
+        const fixed = { ...part }
+        if (fixed.toolInvocation) {
+          fixed.toolInvocation = { ...fixed.toolInvocation, state: "result", result: { confirmed: true } }
+        } else {
+          fixed.state = "result"
+          fixed.result = { confirmed: true }
+          fixed.output = { confirmed: true }
+        }
+        return fixed
+      }
+
+      return part
+    })
+
+    return {
+      id: r.id,
+      role: r.role as UIMessage["role"],
+      parts: fixedParts as UIMessage["parts"],
+    }
+  })
 
   // Compute nutrition remaining
   const meals = mealsRes.data ?? []
