@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Send, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown } from "lucide-react"
+import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown } from "lucide-react"
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
 import { cn } from "@/lib/utils"
@@ -60,7 +60,7 @@ export function ChatView({
   const searchParams = useSearchParams()
   const hadTitleRef = useRef(Boolean(title))
   const prefillHandled = useRef(false)
-  const { messages, sendMessage, status, error, addToolOutput } = useChat({
+  const { messages, sendMessage, status, error, addToolOutput, stop } = useChat({
     id: conversationId,
     messages: initialMessages,
     transport: new DefaultChatTransport({
@@ -71,15 +71,14 @@ export function ChatView({
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: () => {
+      router.refresh()
       if (!hadTitleRef.current) {
         hadTitleRef.current = true
-        router.refresh()
-      } else {
-        router.refresh()
+        // Delayed refresh to catch the async fire-and-forget title generation
+        setTimeout(() => router.refresh(), 3000)
       }
     },
     onError: (err) => {
-      // Surface descriptive messages for common failures
       const msg = err.message || ""
       if (msg.includes("401") || msg.includes("Unauthorized")) {
         toast.error("Session expired. Please refresh the page.")
@@ -93,13 +92,33 @@ export function ChatView({
 
   const [input, setInput] = useState("")
   const [lastFailedInput, setLastFailedInput] = useState<string | null>(null)
+  const [showScrollDown, setShowScrollDown] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
+  // Smart auto-scroll: only scroll if user is near bottom
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    el.scrollTop = el.scrollHeight
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    if (isNearBottom) {
+      el.scrollTop = el.scrollHeight
+    } else {
+      setShowScrollDown(true)
+    }
   }, [messages, status])
+
+  // Track scroll position for "new messages" indicator
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onScroll() {
+      const nearBottom = el!.scrollHeight - el!.scrollTop - el!.clientHeight < 120
+      setShowScrollDown(!nearBottom)
+    }
+    el.addEventListener("scroll", onScroll, { passive: true })
+    return () => el.removeEventListener("scroll", onScroll)
+  }, [])
 
   // Track failed sends for retry
   useEffect(() => {
@@ -120,20 +139,50 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const disabled = status === "streaming" || status === "submitted"
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // Escape to stop streaming
+      if (e.key === "Escape" && (status === "streaming" || status === "submitted")) {
+        e.preventDefault()
+        stop()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [status, stop])
+
+  const isStreaming = status === "streaming" || status === "submitted"
   const isEmpty = messages.length === 0
 
   function sendText(text: string) {
-    if (!text.trim() || disabled) return
+    if (!text.trim() || isStreaming) return
     setLastFailedInput(text)
     setInput("")
-
+    // Reset textarea height
+    if (textareaRef.current) textareaRef.current.style.height = "auto"
     sendMessage({ text })
+  }
+
+  function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value)
+    // Auto-resize textarea
+    const el = e.target
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     sendText(input)
+  }
+
+  function scrollToBottom() {
+    const el = scrollRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      setShowScrollDown(false)
+    }
   }
 
   async function onRename() {
@@ -218,11 +267,11 @@ export function ChatView({
       </div>
 
       {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
           {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
           {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} addToolOutput={addToolOutput} />
+            <MessageBubble key={m.id} message={m} addToolOutput={addToolOutput} isStreaming={status === "streaming"} isLast={m === messages[messages.length - 1]} />
           ))}
           {status === "submitted" ? (
             <div className="flex items-center gap-2 text-sm text-stone animate-fade-in">
@@ -238,9 +287,7 @@ export function ChatView({
                   variant="outline"
                   size="sm"
                   className="shrink-0 border-clay/30 text-clay hover:bg-clay/10"
-                  onClick={() => {
-                    sendText(lastFailedInput)
-                  }}
+                  onClick={() => sendText(lastFailedInput)}
                 >
                   Retry
                 </Button>
@@ -248,6 +295,17 @@ export function ChatView({
             </div>
           ) : null}
         </div>
+
+        {/* Scroll-to-bottom indicator */}
+        {showScrollDown && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-forest/90 text-white px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur-sm hover:bg-forest smooth-hover animate-fade-in"
+            aria-label="Scroll to latest messages"
+          >
+            <ArrowDown className="size-3" /> New messages
+          </button>
+        )}
       </div>
 
       {/* Quick action chips */}
@@ -256,32 +314,45 @@ export function ChatView({
       {/* Input bar */}
       <form
         onSubmit={onSubmit}
-        className="border-t border-border bg-card px-4 py-3 md:px-6"
+        className="border-t border-border bg-card px-4 py-3 md:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
       >
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <Textarea
+            ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleTextareaChange}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()
-                if (!disabled) onSubmit(e)
+                if (!isStreaming) onSubmit(e)
               }
             }}
             placeholder="Ask NutriAI anything…"
             rows={1}
             className="min-h-[48px] max-h-[160px] flex-1 resize-none rounded-2xl border-cream3 bg-cream2 placeholder:text-fog focus:border-sage focus:ring-sage/20"
-            aria-label="Message"
+            aria-label="Type a message to NutriAI"
           />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={disabled || !input.trim()}
-            aria-label="Send"
-            className="bg-forest hover:bg-sage text-white rounded-full size-12 shrink-0"
-          >
-            {disabled ? <Spinner className="size-4" /> : <Send className="size-4" />}
-          </Button>
+          {isStreaming ? (
+            <Button
+              type="button"
+              size="icon"
+              onClick={() => stop()}
+              aria-label="Stop generating"
+              className="bg-clay hover:bg-clay/80 text-white rounded-full size-12 shrink-0"
+            >
+              <Square className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim()}
+              aria-label="Send message"
+              className="bg-forest hover:bg-sage text-white rounded-full size-12 shrink-0"
+            >
+              <Send className="size-4" />
+            </Button>
+          )}
         </div>
       </form>
     </div>
@@ -335,13 +406,20 @@ function Suggestions({ onPick }: { onPick: (text: string) => void }) {
 function MessageBubble({
   message,
   addToolOutput,
+  isStreaming = false,
+  isLast = false,
 }: {
   message: UIMessage
   addToolOutput: AddToolOutput
+  isStreaming?: boolean
+  isLast?: boolean
 }) {
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
   if (!isUser && !isAssistant) return null
+
+  // Show streaming cursor on the last assistant message while streaming
+  const showCursor = isStreaming && isLast && isAssistant
 
   return (
     <div
@@ -374,6 +452,9 @@ function MessageBubble({
                 )}
               >
                 {isUser ? part.text : <AssistantMarkdown text={part.text} />}
+                {showCursor && i === message.parts.length - 1 && (
+                  <span className="inline-block w-[3px] h-[1.1em] bg-forest/70 ml-0.5 align-text-bottom animate-pulse" aria-hidden="true" />
+                )}
               </div>
             )
           }

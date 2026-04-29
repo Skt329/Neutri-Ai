@@ -15,6 +15,10 @@ const TABS = [
 export function MobileBottomNav() {
   const pathname = usePathname()
 
+  // Hide on individual chat pages where the input bar occupies the bottom
+  const isInChat = pathname?.match(/^\/chat\/[a-f0-9-]+/)
+  if (isInChat) return null
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center justify-around h-[60px] safe-area-pb">
       {TABS.map(({ href, label, icon: Icon }) => {

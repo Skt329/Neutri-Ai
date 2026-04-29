@@ -1,17 +1,14 @@
 import { redirect } from "next/navigation"
 import { getAuthUser } from "@/lib/supabase/auth"
+import { getProfile } from "@/lib/supabase/profile"
 import { NutriShell } from "@/components/layouts/nutri-shell"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, supabase } = await getAuthUser()
+  const { user } = await getAuthUser()
 
   if (!user) redirect("/auth/login")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, onboarding_completed")
-    .eq("id", user.id)
-    .maybeSingle()
+  const profile = await getProfile()
 
   if (!profile?.onboarding_completed) {
     redirect("/onboarding")

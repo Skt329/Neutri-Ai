@@ -23,9 +23,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       .maybeSingle(),
     supabase
       .from("messages")
-      .select("id, role, parts, created_at")
+      .select("id, role, parts, ordinal")
       .eq("conversation_id", id)
-      .order("created_at", { ascending: true })
+      .order("ordinal", { ascending: true })
       .limit(200),
     supabase
       .from("meal_logs")

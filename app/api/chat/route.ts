@@ -229,23 +229,29 @@ export async function POST(req: Request) {
       console.log("[chat] onFinish — message count:", finishedMessages.length)
 
       try {
-        // ── Append-only message persistence ──
-        // Only insert messages that don't already exist in the DB.
-        // We query existing message count and insert only the delta.
-        const { count: existingCount } = await supabase
+        // ── Append-only message persistence with ordinal ──
+        // Query the highest ordinal in this conversation, then assign
+        // sequential ordinals to new messages. This guarantees deterministic
+        // ordering even when messages share the same created_at timestamp.
+        const { data: maxRow } = await supabase
           .from("messages")
-          .select("id", { count: "exact", head: true })
+          .select("ordinal")
           .eq("conversation_id", conversationId)
+          .order("ordinal", { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-        const savedCount = existingCount ?? 0
+        const nextOrdinal = (maxRow?.ordinal ?? -1) + 1
+        const savedCount = nextOrdinal // messages 0..nextOrdinal-1 already exist
         const newMessages = finishedMessages.slice(savedCount)
 
         if (newMessages.length > 0) {
-          const rows = newMessages.map((m) => ({
+          const rows = newMessages.map((m, i) => ({
             conversation_id: conversationId,
             user_id: user.id,
             role: m.role,
             parts: m.parts as unknown,
+            ordinal: nextOrdinal + i,
           }))
           const { error: insertErr } = await supabase.from("messages").insert(rows)
           if (insertErr) {

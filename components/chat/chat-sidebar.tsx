@@ -131,6 +131,7 @@ export function ChatSidebar({ conversations, userName, streakDays }: ChatSidebar
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats…"
+            aria-label="Search conversations"
             className="flex-1 bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
           />
         </div>

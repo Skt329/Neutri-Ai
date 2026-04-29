@@ -181,11 +181,12 @@ CREATE TABLE IF NOT EXISTS public.messages (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user','assistant','system','tool')),
   parts JSONB NOT NULL,
+  ordinal INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS messages_conv_idx
-  ON public.messages(conversation_id, created_at ASC);
+  ON public.messages(conversation_id, ordinal ASC);
 
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 

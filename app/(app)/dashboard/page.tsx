@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { getAuthUser } from "@/lib/supabase/auth"
+import { getProfile } from "@/lib/supabase/profile"
 import { Button } from "@/components/ui/button"
 import { CalorieRing } from "@/components/today/calorie-ring"
 import { MealSlotCard } from "@/components/today/meal-slot-card"
@@ -7,7 +8,7 @@ import { buildDeficitAlerts } from "@/lib/deficit-alerts"
 import { computeMealGap } from "@/lib/meal-gaps"
 import { sumTotals, startOfLocalDayISO } from "@/lib/nutrition"
 import { Sparkles, MessageCircle, Lightbulb } from "lucide-react"
-import type { MealLog, NutritionTargets, Profile, DeficitAlert } from "@/lib/types"
+import type { MealLog, NutritionTargets, DeficitAlert } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -15,8 +16,8 @@ export default async function DashboardPage() {
   const { user, supabase } = await getAuthUser()
   if (!user) return null
 
-  const [{ data: profile }, { data: targets }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>(),
+  const [profile, { data: targets }] = await Promise.all([
+    getProfile(),
     supabase
       .from("nutrition_targets")
       .select("*")
