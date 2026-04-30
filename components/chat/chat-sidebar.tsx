@@ -48,7 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { createConversation, deleteConversation, renameConversation } from '@/app/(app)/chat/actions'
+import { deleteConversation, renameConversation } from '@/app/(app)/chat/actions'
 import { toast } from 'sonner'
 
 type Conversation = {
@@ -191,14 +191,13 @@ export function ChatSidebar({ conversations, userName, streakDays }: ChatSidebar
 
         {/* New conversation */}
         <div className="px-3 pt-2 pb-1">
-          <form action={createConversation}>
+          <Link href="/chat/new">
             <Button
-              type="submit"
               className="w-full justify-start gap-2 bg-turmeric hover:bg-turmeric/90 text-ink rounded-xl h-10 font-semibold text-sm"
             >
               <Plus className="size-4" /> New conversation
             </Button>
-          </form>
+          </Link>
         </div>
 
         {/* Search */}

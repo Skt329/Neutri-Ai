@@ -4,6 +4,26 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 
+/**
+ * Creates a conversation row and returns the ID without redirecting.
+ * Used by ChatView for lazy/deferred creation on first message send.
+ */
+export async function createConversationOnly(): Promise<string> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Not authenticated")
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({ user_id: user.id, title: null })
+    .select("id")
+    .single()
+  if (error) throw new Error(error.message)
+  revalidatePath("/chat")
+  return data.id
+}
+
 export async function createConversation(): Promise<void> {
   const supabase = await createClient()
   const {

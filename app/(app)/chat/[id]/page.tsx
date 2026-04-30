@@ -10,6 +10,21 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const { user, supabase } = await getAuthUser()
   if (!user) return null
 
+  // ── Lazy creation: "/chat/new" renders an empty ChatView ──
+  // No DB row is created until the user sends their first message.
+  if (id === "new") {
+    return (
+      <ChatView
+        conversationId={null}
+        initialMessages={[]}
+        title={null}
+        caloriesLeft={null}
+        proteinLeft={null}
+        goalLabel={null}
+      />
+    )
+  }
+
   // Fetch conversation, messages, and nutrition data in parallel
   const now = new Date()
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()

@@ -13,7 +13,7 @@ export function NutriShell({ children, userName }: NutriShellProps) {
   const pathname = usePathname()
   // MobileBottomNav hides itself on individual chat pages — skip its
   // reserved padding so the chat input bar sits flush at the bottom.
-  const isInChat = pathname?.match(/^\/chat\/[a-f0-9-]+/)
+  const isInChat = pathname?.match(/^\/chat\/([a-f0-9-]+|new)/)
 
   return (
     <div className="flex flex-col min-h-dvh bg-background">

@@ -53,7 +53,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex h-[calc(100dvh-56px)] md:h-[calc(100dvh-57px)] bg-cream">
+    <div className="flex h-dvh md:h-[calc(100dvh-57px)] bg-cream">
       <ChatSidebar
         conversations={convos ?? []}
         userName={profile?.full_name ?? user.email?.split('@')[0] ?? null}
