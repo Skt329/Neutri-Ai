@@ -10,6 +10,11 @@ import { sumTotals, startOfLocalDayISO } from "@/lib/nutrition"
 import { Sparkles, MessageCircle, Lightbulb } from "lucide-react"
 import type { MealLog, NutritionTargets, DeficitAlert } from "@/lib/types"
 
+export const metadata = {
+  title: "Dashboard — NutriAI",
+  description: "Today's nutrition overview — calories, macros, meal gaps, and AI-powered insights.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function DashboardPage() {

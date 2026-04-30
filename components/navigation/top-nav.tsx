@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MessageSquare, LayoutGrid, Package, UserCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StreakBadge } from '@/components/navigation/streak-badge'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const NAV_ITEMS = [
   { href: '/chat', label: 'Chat', icon: MessageSquare },
@@ -57,6 +58,7 @@ export function TopNav({ userName }: TopNavProps) {
       {/* Right side: streak (async) + avatar */}
       <div className="flex items-center gap-3">
         <StreakBadge />
+        <ThemeToggle />
         <Link
           href="/profile"
           className="flex items-center justify-center size-9 rounded-full bg-forest text-white text-sm font-semibold smooth-hover hover:ring-2 hover:ring-sage/30"

@@ -6,6 +6,11 @@ import { PantrySummary } from "./pantry-summary"
 import { MessageCircle, Plus, Search, Sparkles } from "lucide-react"
 import type { PantryItem } from "@/lib/types"
 
+export const metadata = {
+  title: "Pantry — NutriAI",
+  description: "Manage your kitchen inventory — NutriAI uses your pantry to suggest meals you can cook.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function PantryPage() {

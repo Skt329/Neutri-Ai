@@ -89,6 +89,83 @@
   --sh2: 0 4px 24px rgba(0,0,0,0.12);
 }
 
+/* ── Dark Mode ── */
+.dark {
+  /* ── Core Surfaces ── */
+  --cream: #141210;
+  --cream2: #1C1A17;
+  --cream3: #2A2724;
+  --white: #1C1A17;
+
+  /* ── Brand Greens (forest stays dark for bg-forest text-white combos) ── */
+  --forest: #1A4032;
+  --sage: #3D8B62;
+  --sage2: #5BAA7D;
+  --mint: #1A3329;
+  --mint2: #152B22;
+
+  /* ── Accent Colors ── */
+  --turmeric: #F0B94E;
+  --turmeric-l: #2C2312;
+  --clay: #E87558;
+  --clay-l: #2C1812;
+
+  /* ── Text Colors ── */
+  --ink: #EDEBE8;
+  --stone: #9A9389;
+  --fog: #666058;
+  --ghost: #3A3630;
+
+  /* ── Semantic Tokens ── */
+  --background: var(--cream);
+  --foreground: var(--ink);
+  --card: #1C1A17;
+  --card-foreground: var(--ink);
+  --popover: #1C1A17;
+  --popover-foreground: var(--ink);
+  --primary: var(--sage);
+  --primary-foreground: #EDEBE8;
+  --secondary: var(--cream2);
+  --secondary-foreground: var(--stone);
+  --muted: var(--cream2);
+  --muted-foreground: var(--stone);
+  --accent: var(--turmeric);
+  --accent-foreground: #141210;
+  --destructive: var(--clay);
+  --destructive-foreground: #EDEBE8;
+  --border: rgba(255,255,255,0.08);
+  --input: var(--cream2);
+  --ring: var(--sage);
+
+  /* ── Macro Colors (brighter for dark bg) ── */
+  --macro-cal: #E87558;
+  --macro-protein: #FB923C;
+  --macro-carbs: #FACC15;
+  --macro-fat: #60A5FA;
+  --macro-fiber: #34D399;
+
+  /* ── Chart Colors ── */
+  --chart-1: var(--macro-cal);
+  --chart-2: var(--macro-protein);
+  --chart-3: var(--macro-carbs);
+  --chart-4: var(--macro-fat);
+  --chart-5: var(--macro-fiber);
+
+  /* ── Sidebar (darker, keep forest feel) ── */
+  --sidebar: #0F0E0D;
+  --sidebar-foreground: rgba(255,255,255,0.8);
+  --sidebar-primary: var(--sage);
+  --sidebar-primary-foreground: #EDEBE8;
+  --sidebar-accent: rgba(255,255,255,0.06);
+  --sidebar-accent-foreground: rgba(255,255,255,0.7);
+  --sidebar-border: rgba(255,255,255,0.05);
+  --sidebar-ring: var(--sage);
+
+  /* ── Shadows ── */
+  --sh: 0 2px 16px rgba(0,0,0,0.3);
+  --sh2: 0 4px 24px rgba(0,0,0,0.4);
+}
+
 @theme inline {
   --font-sans: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', system-ui, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
@@ -322,7 +399,7 @@ html {
 /* Selection */
 ::selection {
   background: var(--mint);
-  color: var(--forest);
+  color: var(--ink);
 }
 
 /* Prose for chat markdown */
@@ -334,7 +411,7 @@ html {
 .prose-chat ul { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
 .prose-chat ol { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
 .prose-chat li { margin-bottom: 0.25rem; }
-.prose-chat strong { font-weight: 600; color: var(--forest); }
+.prose-chat strong { font-weight: 600; color: var(--sage); }
 .prose-chat code {
   background: var(--cream2);
   padding: 0.1em 0.35em;

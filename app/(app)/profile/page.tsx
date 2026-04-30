@@ -10,6 +10,11 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+export const metadata = {
+  title: "Profile — NutriAI",
+  description: "Manage your body metrics, dietary preferences, kitchen setup, and daily nutrition targets.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function ProfilePage() {

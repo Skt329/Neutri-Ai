@@ -6,6 +6,11 @@ import { ShoppingBag, Link2, MessageCircle } from "lucide-react"
 import { getSwiggyAdapter } from "@/lib/swiggy/adapter"
 import { getAuthUser } from "@/lib/supabase/auth"
 
+export const metadata = {
+  title: "Swiggy — NutriAI",
+  description: "Order meals that fit your macros directly from Swiggy, powered by NutriAI.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function SwiggyPage() {

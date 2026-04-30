@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button"
 import { createConversation } from "./actions"
 import { MobileConvoList } from "@/components/chat/mobile-convo-list"
 
+export const metadata = {
+  title: "Chat — NutriAI",
+  description: "Start a conversation with your AI dietitian — log meals, get recipes, and track nutrition.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function ChatIndexPage({

@@ -7,6 +7,11 @@ import { MessageCircle, Sparkles, Clock, Flame, Drumstick, Wheat, Droplet } from
 import type { MealLog, NutritionTargets } from "@/lib/types"
 import { formatNumber } from "@/lib/format"
 
+export const metadata = {
+  title: "Meals — NutriAI",
+  description: "Your complete food diary — log meals, track macros, and monitor daily nutrition targets.",
+}
+
 export const dynamic = "force-dynamic"
 
 export default async function MealsPage() {
