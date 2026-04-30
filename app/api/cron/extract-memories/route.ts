@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
-import { generateText } from "ai"
-import { nimChatModel, nimEmbedBatch } from "@/lib/ai/nim-provider"
+import { generateText, Output } from "ai"
+import { z } from "zod"
+import { azureChatModel } from "@/lib/ai/azure-provider"
+import { nimEmbedBatch } from "@/lib/ai/nim-provider"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
@@ -11,11 +13,35 @@ const BATCH_LIMIT = 10 // conversations per cron run
 const CRON_SECRET = process.env.CRON_SECRET
 
 /**
+ * Zod schema for structured memory extraction.
+ *
+ * GPT-4.1 returns a validated object conforming to this schema via
+ * Output.object — no manual JSON parsing or fallback strategies needed.
+ */
+const MemoryExtractionSchema = z.object({
+  memories: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .describe("A single durable fact about the user, written as a complete standalone sentence."),
+    )
+    .describe(
+      "Array of stable, long-term facts about the user. " +
+      "Include allergies, conditions, preferences, goals, dislikes, dietary restrictions, " +
+      "routine patterns, family info, cooking habits. " +
+      "Exclude ephemeral content (today's meals, mood, one-off questions, small talk). " +
+      "Return an empty array if nothing durable was discussed.",
+    ),
+})
+
+/**
  * POST /api/cron/extract-memories
  *
  * Deferred memory extraction — runs every 30 min via pg_cron or manual trigger.
  * Finds conversations inactive for 3+ hours, extracts durable facts from the
- * FULL conversation, batch-embeds all memories in 1 API call, and stores them.
+ * FULL conversation using GPT-4.1 structured output, batch-embeds all memories
+ * in 1 API call, and stores them with semantic dedup.
  *
  * Auth: Bearer token matching CRON_SECRET env var.
  */
@@ -96,7 +122,7 @@ async function processConversation(
     return 0
   }
 
-  // 2. Extract durable facts with 1 LLM call over the FULL conversation
+  // 2. Extract durable facts with GPT-4.1 structured output (Zod-enforced)
   const memories = await extractFactsFromConversation(conversationText)
 
   if (memories.length === 0) {
@@ -170,16 +196,19 @@ async function processConversation(
 }
 
 /**
- * Extract durable facts from a full conversation using 1 LLM call.
- * Returns an array of memory strings.
+ * Extract durable facts from a full conversation using GPT-4.1 structured output.
+ *
+ * Uses Output.object with a Zod schema to guarantee the model returns a validated
+ * { memories: string[] } object. No manual JSON parsing or fallback strategies needed.
  */
 async function extractFactsFromConversation(conversationText: string): Promise<string[]> {
   // Truncate very long conversations to avoid token limits
   const truncated = conversationText.slice(0, 12000)
 
-  const { text } = await generateText({
-    model: nimChatModel,
-    system: `You extract stable, long-term facts about the USER from a full conversation with an AI dietitian.
+  try {
+    const { output } = await generateText({
+      model: azureChatModel,
+      system: `You extract stable, long-term facts about the USER from a full conversation with an AI dietitian.
 
 Rules:
 - Only extract DURABLE facts (allergies, conditions, preferences, goals, dislikes, dietary restrictions, routine patterns, family info, cooking habits).
@@ -187,51 +216,15 @@ Rules:
 - Do NOT extract facts about the assistant.
 - Each fact must be a complete, standalone sentence.
 - Deduplicate — don't repeat the same fact in different words.
-- If nothing durable was discussed, return an empty array.
+- If nothing durable was discussed, return an empty memories array.`,
+      prompt: truncated,
+      output: Output.object({ schema: MemoryExtractionSchema }),
+    })
 
-IMPORTANT: Respond with ONLY a JSON array of strings. No markdown, no explanation.
-Example: ["User is lactose intolerant", "User prefers South Indian cuisine", "User works out at 6 AM"]
-If nothing worth remembering: []`,
-    prompt: truncated,
-  })
-
-  return parseMemoryResponse(text)
-}
-
-/**
- * Parse LLM response into memory strings. Handles multiple formats robustly.
- */
-function parseMemoryResponse(text: string): string[] {
-  const strategies = [
-    () => tryParse(text.trim()),
-    () => tryParse(text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim()),
-    () => { const m = text.match(/\[[\s\S]*\]/); return m ? tryParse(m[0]) : [] },
-    () => { const m = text.match(/\{[\s\S]*\}/); return m ? tryParse(m[0]) : [] },
-  ]
-
-  for (const strategy of strategies) {
-    const result = strategy()
-    if (result.length > 0) return result
+    return output?.memories ?? []
+  } catch (err) {
+    console.error("[cron/extract-memories] Structured extraction failed:", err instanceof Error ? err.message : err)
+    return []
   }
-
-  console.warn("[cron/extract-memories] Could not parse LLM response:", text.slice(0, 200))
-  return []
 }
 
-function tryParse(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return parsed.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-    }
-    if (typeof parsed === "object" && parsed !== null) {
-      const arr = parsed.memories ?? parsed.facts ?? parsed.items ?? parsed.results
-      if (Array.isArray(arr)) {
-        return arr
-          .map((item: unknown) => (typeof item === "string" ? item : (item as any)?.content))
-          .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-      }
-    }
-  } catch { /* not valid JSON */ }
-  return []
-}

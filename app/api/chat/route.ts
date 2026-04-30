@@ -1,5 +1,5 @@
 import { convertToModelMessages, generateText, stepCountIs, streamText, type UIMessage } from "ai"
-import { nimChatModel } from "@/lib/ai/nim-provider"
+import { azureChatModel } from "@/lib/ai/azure-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { buildTools } from "@/lib/ai/tools"
@@ -38,7 +38,7 @@ function checkRateLimit(userId: string): boolean {
 async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
   try {
     const { text } = await generateText({
-      model: nimChatModel,
+      model: azureChatModel,
       maxOutputTokens: 32,
       prompt:
         "Create a short, specific chat title (3 to 6 words, no quotes, no punctuation at the end, Title Case). " +
@@ -195,8 +195,8 @@ export async function POST(req: Request) {
   const tools = buildTools(supabase, user.id)
 
   const result = streamText({
-    // NVIDIA NIM: Llama 3.3 70B Instruct — native tool calling, fast, reliable.
-    model: nimChatModel,
+    // Azure OpenAI: GPT-4.1 — native tool calling, structured output, fast.
+    model: azureChatModel,
     maxOutputTokens: 4096,
     system,
     messages: await convertToModelMessages(messages),

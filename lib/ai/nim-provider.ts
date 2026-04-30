@@ -1,25 +1,16 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
-
 /**
- * NVIDIA NIM provider — OpenAI-compatible gateway to NVIDIA's hosted models.
+ * NVIDIA NIM provider — embeddings only.
  *
- * Chat:      meta/llama-3.3-70b-instruct  (70B dense, native tool calling, fast)
  * Embedding: nvidia/llama-3.2-nemoretriever-300m-embed-v1  (1024-dim, asymmetric)
+ *
+ * Chat model has been migrated to Azure OpenAI GPT-4.1 (see azure-provider.ts).
+ * This module is retained exclusively for the NeMo Retriever embedding API,
+ * which requires the `input_type` parameter not supported by the AI SDK's
+ * generic embed() function.
  */
 
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
 const EMBED_MODEL = "nvidia/llama-3.2-nemoretriever-300m-embed-v1"
-
-const nim = createOpenAICompatible({
-  name: "nvidia-nim",
-  baseURL: NIM_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${process.env.NIM_API_KEY}`,
-  },
-})
-
-/** Main chat model — Llama 3.3 70B Instruct with native tool calling. */
-export const nimChatModel = nim.chatModel("meta/llama-3.3-70b-instruct")
 
 /**
  * Custom embed function for NeMo Retriever — an asymmetric model that
