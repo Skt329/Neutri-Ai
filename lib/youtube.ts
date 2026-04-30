@@ -123,7 +123,10 @@ export async function fetchYouTubeTranscript(
           fetchErrors.push({ lang: "auto", error: fbMsg })
           return {
             ok: false,
-            error: "Could not extract transcript from this video.",
+            error:
+              "Could not extract transcript from this video. " +
+              "Errors: " +
+              fetchErrors.map((e) => `[${e.lang}] ${e.error}`).join(" | "),
             details: fetchErrors,
           }
         }
