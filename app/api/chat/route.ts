@@ -258,6 +258,30 @@ export async function POST(req: Request) {
           }
         }
 
+        // ── Update last pre-existing message if its parts have grown ──
+        // Multi-step tool flows (propose → confirm → log → follow-up text)
+        // add new parts to the EXISTING assistant message. The insert above
+        // only captures NEW messages, so we must also update the last saved
+        // message to persist tool outputs and continuation text.
+        // Skip the update for plain text messages (no tool parts) to avoid
+        // a wasted DB write on ~80% of requests.
+        if (savedCount > 0 && finishedMessages.length >= savedCount) {
+          const lastPreExisting = finishedMessages[savedCount - 1]
+          const hasToolParts = lastPreExisting.parts.some(
+            (p) => p.type === "tool-invocation" || (p.type.startsWith("tool-") && p.type !== "tool-invocation"),
+          )
+          if (hasToolParts) {
+            const { error: updateErr } = await supabase
+              .from("messages")
+              .update({ parts: lastPreExisting.parts as unknown })
+              .eq("conversation_id", conversationId)
+              .eq("ordinal", maxOrdinal)
+            if (updateErr) {
+              console.error("[chat] Failed to update existing message parts:", updateErr.message)
+            }
+          }
+        }
+
         // ── Update conversation timestamp ──
         await supabase
           .from("conversations")

@@ -595,6 +595,17 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
   // During streaming, the last message changes per token — must re-render
   if (next.isLast && next.isStreaming) return false
   if (prev.message.parts.length !== next.message.parts.length) return false
+  // Detect tool state/output changes (e.g. addToolOutput changing
+  // a part from "input-available" to "output-available" without
+  // changing parts count). Without this, the card stays interactive
+  // after the user confirms.
+  for (let i = 0; i < prev.message.parts.length; i++) {
+    const pp = prev.message.parts[i] as any
+    const np = next.message.parts[i] as any
+    const pState = pp?.toolInvocation?.state ?? pp?.state
+    const nState = np?.toolInvocation?.state ?? np?.state
+    if (pState !== nState) return false
+  }
   return true
 })
 
