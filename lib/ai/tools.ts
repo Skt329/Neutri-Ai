@@ -457,7 +457,10 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         }
 
         const result = await fetchYouTubeTranscript(videoId, supabase)
-        if (!result.ok) return result
+        if (!result.ok) {
+          console.error(`[fetch_youtube_recipe] Transcript fetch failed for ${videoId}:`, result.error)
+          return result
+        }
 
         return {
           ok: true as const,
