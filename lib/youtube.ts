@@ -102,17 +102,29 @@ export async function fetchYouTubeTranscript(
       // Try English first
       segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" })
       detectedLang = "en"
-    } catch {
+    } catch (enErr) {
+      console.warn(
+        `[youtube] Failed to fetch English transcript for ${videoId}:`,
+        enErr instanceof Error ? enErr.message : enErr,
+      )
       try {
         // Fallback: Hindi (common for Indian recipe content)
         segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "hi" })
         detectedLang = "hi"
-      } catch {
+      } catch (hiErr) {
+        console.warn(
+          `[youtube] Failed to fetch Hindi transcript for ${videoId}:`,
+          hiErr instanceof Error ? hiErr.message : hiErr,
+        )
         try {
           // Final fallback: any available language
           segments = await YoutubeTranscript.fetchTranscript(videoId)
           detectedLang = null // unknown
-        } catch {
+        } catch (fallbackErr) {
+          console.error(
+            `[youtube] All transcript fetches failed for ${videoId}:`,
+            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
+          )
           return {
             ok: false,
             error:
@@ -124,6 +136,7 @@ export async function fetchYouTubeTranscript(
     }
 
     if (!segments || segments.length === 0) {
+      console.warn(`[youtube] Transcript fetched but empty for ${videoId}`)
       return {
         ok: false,
         error: "This video has no transcript/captions available.",
