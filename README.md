@@ -1,5 +1,7 @@
 # NeutriAI 🥗
 
+> **Live Demo:** [skt329-neutri-ai.vercel.app](https://skt329-neutri-ai.vercel.app)
+
 An AI-powered nutrition coaching platform built with Next.js, Supabase, and NVIDIA NIM. NeutriAI acts as a personal dietitian — tracking meals, managing pantry, setting macro targets, and remembering your preferences over time through long-term memory.
 
 ## Tech Stack
