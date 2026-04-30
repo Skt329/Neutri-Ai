@@ -533,9 +533,9 @@ export function ProposePantryCard({
         icon={<Package className="size-4" />}
         variant={output.confirmed ? "resolved" : "cancelled"}
       >
-        {output.confirmed && output.items ? (
+        {output.confirmed ? (
           <ul className="flex flex-col gap-2">
-            {output.items.map((it, i) => (
+            {(output.items ?? input.items).map((it, i) => (
               <li key={i} className="flex flex-col gap-1 rounded-md bg-muted/40 px-2.5 py-2">
                 <div className="flex items-center gap-2 text-sm">
                   <CategoryIcon category={it.category} size="sm" />

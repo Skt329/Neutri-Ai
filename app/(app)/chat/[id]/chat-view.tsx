@@ -116,10 +116,21 @@ export function ChatView({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [renameValue, setRenameValue] = useState(title ?? "")
   const [actionPending, setActionPending] = useState(false)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const isAutoScrollingRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
+
+  // Detect touch device — on mobile, Enter inserts newline (send via button).
+  // On desktop, Enter sends (Shift+Enter for newline).
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)")
+    setIsTouchDevice(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsTouchDevice(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
 
   // Smart auto-scroll: batched with rAF to prevent jank during streaming
   useEffect(() => {
@@ -350,7 +361,9 @@ export function ChatView({
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              // Desktop: Enter sends, Shift+Enter newline
+              // Mobile: Enter always inserts newline (send via button)
+              if (e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
                 e.preventDefault()
                 if (!isStreaming) onSubmit(e)
               }
