@@ -55,6 +55,7 @@ type TranscriptSuccess = {
 type TranscriptError = {
   ok: false
   error: string
+  details?: Array<{ lang: string; error: string }>
 }
 
 export type TranscriptResult = TranscriptSuccess | TranscriptError
