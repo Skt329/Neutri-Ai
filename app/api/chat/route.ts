@@ -1,8 +1,8 @@
-import { convertToModelMessages, generateText, stepCountIs, streamText, type UIMessage } from "ai"
+import { convertToModelMessages, generateText, hasToolCall, stepCountIs, streamText, type UIMessage } from "ai"
 import { azureChatModel } from "@/lib/ai/azure-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildTools } from "@/lib/ai/tools"
+import { buildTools, CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
 import { buildSystemPrompt } from "@/lib/ai/system-prompt"
 import { retrieveMemories } from "@/lib/ai/memory"
 import type { NutritionTargets, Profile } from "@/lib/types"
@@ -201,7 +201,9 @@ export async function POST(req: Request) {
     system,
     messages: await convertToModelMessages(messages),
     tools,
-    stopWhen: stepCountIs(12),
+    // Stop the multi-step loop when a client tool is called (no execute fn)
+    // OR after 12 server-side steps (safety limit against infinite loops).
+    stopWhen: [...CLIENT_TOOL_NAMES.map((n) => hasToolCall(n)), stepCountIs(12)],
     // Vercel AI SDK built-in telemetry (OpenTelemetry compatible)
     experimental_telemetry: {
       isEnabled: true,

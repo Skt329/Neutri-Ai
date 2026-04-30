@@ -111,8 +111,10 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
 
     propose_pantry_items: tool({
       description:
-        "Show the user a draft list of pantry items they can review, edit, or cancel BEFORE anything is saved. " +
-        "Always call this first when the user mentions groceries or what they have. " +
+        "WRITE-ONLY: Show the user an editable draft of NEW pantry items to ADD. " +
+        "Call this ONLY when the user wants to ADD, STOCK, or SAVE new groceries/ingredients to their pantry. " +
+        "NEVER call this to read, list, view, or query existing pantry contents — use `list_pantry` for that. " +
+        "NEVER call this for recipe suggestions — use `suggest_recipes_from_pantry` for that. " +
         "You MUST pick `category` from the allowed enum AND provide per-item nutrition (calories_kcal, protein_g, carbs_g, fat_g, fiber_g, nutrition_basis) " +
         "using common reference values. Prefer per_100g for solids and per_100ml for liquids; use per_piece only for naturally countable items (eggs, bananas).",
       inputSchema: z.object({
@@ -254,7 +256,10 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
 
     list_pantry: tool({
       description:
-        "List the user's current pantry, including per-item nutrition so you can answer macro questions about inventory.",
+        "READ-ONLY: Fetch the user's current pantry inventory. " +
+        "Call this when the user asks what they have, wants to see their pantry, or asks about stock/ingredients on hand. " +
+        "Also use this before answering macro questions about their inventory. " +
+        "This tool only reads data — it never modifies the pantry.",
       inputSchema: z.object({}),
       execute: async () => {
         const { data, error } = await supabase
@@ -489,7 +494,11 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
 
     suggest_recipes_from_pantry: tool({
       description:
-        "Return recipe ideas that can be made using only the user's current pantry. Call this when the user asks 'what can I cook?' or after they tap the pantry recipe button. You receive the current pantry — respond with at most 5 concrete dishes in the assistant message, each with (a) name, (b) 1-line description, (c) the pantry items it uses.",
+        "Fetch the user's pantry and generate recipe ideas from it. " +
+        "Call this when the user asks 'what can I cook?', 'suggest recipes', 'what should I make for breakfast?', " +
+        "or any variation of recipe/meal suggestions based on their available ingredients. " +
+        "This tool fetches the pantry internally — do NOT call `list_pantry` first. " +
+        "Respond with at most 5 concrete dishes, each with (a) name, (b) 1-line description, (c) the pantry items it uses.",
       inputSchema: z.object({
         mealType: z.enum(MEAL_TYPES).nullable(),
         maxResults: z.number().int().min(1).max(8).default(5),
