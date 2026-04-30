@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown } from "lucide-react"
 import { toast } from "sonner"
-import { deleteConversation, renameConversation, createConversationOnly } from "../actions"
+import { deleteConversation, renameConversation } from "../actions"
 import { cn } from "@/lib/utils"
 
 import {
@@ -61,24 +61,20 @@ import { QuickActions } from "@/components/chat/quick-actions"
 type AddToolOutput = (args: { tool: string; toolCallId: string; output: unknown }) => void
 
 export function ChatView({
-  conversationId: initialConversationId,
+  conversationId,
   initialMessages,
   title,
   caloriesLeft,
   proteinLeft,
   goalLabel,
 }: {
-  conversationId: string | null
+  conversationId: string
   initialMessages: UIMessage[]
   title: string | null
   caloriesLeft: number | null
   proteinLeft: number | null
   goalLabel: string | null
 }) {
-  // ── Lazy creation: resolve the real conversation ID on first send ──
-  const [resolvedId, setResolvedId] = useState<string | null>(initialConversationId)
-  const creatingRef = useRef(false) // guard against double-creation
-  const conversationId = resolvedId ?? "pending"
   const router = useRouter()
   const searchParams = useSearchParams()
   const hadTitleRef = useRef(Boolean(title))
@@ -86,12 +82,12 @@ export function ChatView({
   const { messages, sendMessage, status, error, addToolOutput, stop } = useChat({
     id: conversationId,
     messages: initialMessages,
-    transport: resolvedId ? new DefaultChatTransport({
+    transport: new DefaultChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ messages: msgs }) => ({
-        body: { messages: msgs, conversationId: resolvedId },
+        body: { messages: msgs, conversationId },
       }),
-    }) : undefined,
+    }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: () => {
       router.refresh()
@@ -195,31 +191,13 @@ export function ChatView({
   const isStreaming = status === "streaming" || status === "submitted"
   const isEmpty = messages.length === 0
 
-  const sendText = useCallback(async (text: string) => {
+  const sendText = useCallback((text: string) => {
     if (!text.trim() || status === "streaming" || status === "submitted") return
     setLastFailedInput(text)
     setInput("")
     if (textareaRef.current) textareaRef.current.style.height = "auto"
-
-    // ── Lazy creation: create conversation on first send ──
-    if (!resolvedId && !creatingRef.current) {
-      creatingRef.current = true
-      try {
-        const newId = await createConversationOnly()
-        setResolvedId(newId)
-        // Replace URL so back button goes to /chat, not /chat/new
-        window.history.replaceState(null, "", `/chat/${newId}`)
-        // Delay send slightly so useChat picks up new transport with resolved ID
-        await new Promise((r) => setTimeout(r, 50))
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Failed to create conversation")
-        creatingRef.current = false
-        return
-      }
-    }
-
     sendMessage({ text })
-  }, [status, sendMessage, resolvedId])
+  }, [status, sendMessage])
 
   function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value)

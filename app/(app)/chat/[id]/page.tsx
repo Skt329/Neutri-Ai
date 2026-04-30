@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation"
 import { getAuthUser } from "@/lib/supabase/auth"
 import { ChatView } from "./chat-view"
+import { NewChatView } from "./new-chat-view"
+import { notFound } from "next/navigation"
 import type { UIMessage } from "ai"
 
 export const dynamic = "force-dynamic"
@@ -10,19 +11,11 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const { user, supabase } = await getAuthUser()
   if (!user) return null
 
-  // ── Lazy creation: "/chat/new" renders an empty ChatView ──
-  // No DB row is created until the user sends their first message.
+  // ── Lazy creation: "/chat/new" renders a lightweight input-only view ──
+  // No DB row, no useChat hook. On first send it creates the conversation
+  // and navigates to /chat/{realId}?prefill={message} for seamless handoff.
   if (id === "new") {
-    return (
-      <ChatView
-        conversationId={null}
-        initialMessages={[]}
-        title={null}
-        caloriesLeft={null}
-        proteinLeft={null}
-        goalLabel={null}
-      />
-    )
+    return <NewChatView />
   }
 
   // Fetch conversation, messages, and nutrition data in parallel
@@ -64,12 +57,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   if (!convoRes.data) notFound()
 
   // ── Reconstruct UIMessages with resolved client tool outputs ──
-  // Client tools (propose_meal_log, ask_user, etc.) are saved to DB with
-  // state "call" and no output because the user's confirmation was sent as
-  // a separate auto-round-trip. On reload, this would render them as
-  // interactive forms again. Fix: if a client tool part appears in any
-  // message that is NOT the last one, the user already responded — we
-  // synthesize a default "confirmed" output so the card is read-only.
   const CLIENT_TOOLS = ["propose_meal_log", "ask_user", "choose_option", "propose_pantry_items"]
   const rawMessages = msgsRes.data ?? []
 
@@ -78,7 +65,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     const isLastMessage = msgIndex === rawMessages.length - 1
 
     const fixedParts = parts.map((part: any) => {
-      // Only process tool invocation parts for client tools
       const inv = part.toolInvocation ?? part
       const toolName: string | undefined =
         inv.toolName ??
@@ -88,12 +74,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
       if (!toolName || !CLIENT_TOOLS.includes(toolName)) return part
 
-      // Already has output → no fix needed
       const hasOutput = inv.state === "result" || inv.state === "output-available" || inv.result !== undefined || inv.output !== undefined
       if (hasOutput) return part
 
-      // If this is NOT the last message, subsequent messages exist →
-      // the user already confirmed this tool call. Synthesize output.
       if (!isLastMessage) {
         const fixed = { ...part }
         if (fixed.toolInvocation) {
