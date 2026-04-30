@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeTargets } from "@/lib/nutrition"
 import { getSwiggyAdapter, SwiggyNotConfiguredError } from "@/lib/swiggy/adapter"
 import { PANTRY_CATEGORIES, MEAL_TYPES, normalizeCategory } from "@/lib/categories"
-import { extractVideoId, fetchYouTubeTranscript } from "@/lib/youtube"
+import { extractVideoId, fetchYouTubeTranscript, searchYouTubeRecipes } from "@/lib/youtube"
 
 /**
  * All tools NutriAI can call. Split into two groups:
@@ -428,18 +428,45 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
       },
     }),
 
+    search_youtube_recipes: tool({
+      description:
+        "Search YouTube for recipe/cooking videos matching a query. " +
+        "Call this when the user asks to find, search for, or discover recipe videos on YouTube. " +
+        "Returns a list of video results — then call choose_option to let the user pick one. " +
+        "After the user picks a video, call fetch_youtube_recipe with the selected video's ID or URL.",
+      inputSchema: z.object({
+        query: z.string().min(2).max(100).describe("Recipe search query, e.g. 'paneer butter masala'"),
+        maxResults: z.number().int().min(3).max(8).default(5),
+      }),
+      execute: async ({ query, maxResults }) => {
+        const result = await searchYouTubeRecipes(query, maxResults)
+        if (!result.ok) {
+          console.error(`[search_youtube_recipes] Search failed for "${query}":`, result.error)
+          return result
+        }
+        return {
+          ok: true as const,
+          videos: result.videos,
+          instruction:
+            "Present these videos to the user using choose_option. " +
+            "Format each option as: '📺 {title} — {channel} ({duration}, {views})'. " +
+            "After the user picks a video, call fetch_youtube_recipe with the video URL " +
+            "https://youtube.com/watch?v={videoId} and their question about the recipe.",
+        }
+      },
+    }),
+
     fetch_youtube_recipe: tool({
       description:
         "Extract the transcript from a YouTube video about cooking, recipes, or nutrition. " +
-        "Call this when the user pastes a YouTube link and asks about the recipe, ingredients, " +
-        "cooking steps, tips, or nutritional content of a food video. " +
+        "Call this when the user pastes a YouTube link, selects a video from search results, " +
+        "or asks about the recipe, ingredients, cooking steps, or nutritional content of a food video. " +
         "ONLY use for food/recipe/nutrition/cooking videos — refuse if the video is about " +
-        "an unrelated topic (the tool will flag non-food content). " +
-        "After receiving the transcript, answer the user's specific question from it. " +
+        "an unrelated topic. After receiving the transcript, answer the user's specific question. " +
         "If the transcript is in a different language than the user's conversation, " +
         "translate the recipe content into the user's language before responding.",
       inputSchema: z.object({
-        url: z.string().url().describe("The YouTube video URL pasted by the user."),
+        url: z.string().describe("The YouTube video URL or video ID."),
         question: z
           .string()
           .describe(
@@ -452,7 +479,7 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         if (!videoId) {
           return {
             ok: false as const,
-            error: "Invalid YouTube URL. Please paste a valid YouTube video link.",
+            error: "Invalid YouTube URL or video ID. Please paste a valid YouTube video link.",
           }
         }
 
@@ -465,6 +492,7 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         return {
           ok: true as const,
           videoId: result.videoId,
+          title: result.title,
           wordCount: result.wordCount,
           language: result.language,
           transcript: result.transcript,

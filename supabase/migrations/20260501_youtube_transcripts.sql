@@ -25,3 +25,9 @@ CREATE POLICY "Authenticated users can insert transcripts"
   ON youtube_transcripts FOR INSERT
   TO authenticated
   WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can update transcripts"
+  ON youtube_transcripts FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);

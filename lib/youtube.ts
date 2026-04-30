@@ -1,15 +1,25 @@
-import { YoutubeTranscript } from "youtube-transcript"
+import { Innertube, YTNodes } from "youtubei.js"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
- * YouTube transcript module for NutriAI.
+ * YouTube module for NutriAI.
  *
- * Responsibilities:
- *  - Parse any YouTube URL format → video ID
- *  - Fetch captions via `youtube-transcript` (no API key required)
- *  - DB-persistent cache in `youtube_transcripts` table (7-day TTL)
- *  - Truncate transcript to ~6,000 words for context window budget
+ * Uses `youtubei.js` (Innertube API) for:
+ *  - Searching recipe videos
+ *  - Extracting transcripts (including auto-captions)
+ *  - DB-persistent caching in `youtube_transcripts` (7-day TTL)
  */
+
+// ── Innertube Singleton ─────────────────────────────────────────────────
+
+let _yt: Innertube | null = null
+
+async function getClient(): Promise<Innertube> {
+  if (!_yt) {
+    _yt = await Innertube.create({ generate_session_locally: true })
+  }
+  return _yt
+}
 
 // ── URL Parsing ─────────────────────────────────────────────────────────
 
@@ -32,11 +42,92 @@ const YT_PATTERNS = [
  */
 export function extractVideoId(url: string): string | null {
   const trimmed = url.trim()
+
+  // Try regex patterns first
   for (const pattern of YT_PATTERNS) {
     const match = trimmed.match(pattern)
     if (match?.[1]) return match[1]
   }
+
+  // Fallback: if input looks like a raw 11-char video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed
+
   return null
+}
+
+// ── Video Search ────────────────────────────────────────────────────────
+
+export type VideoSearchResult = {
+  videoId: string
+  title: string
+  channel: string
+  duration: string
+  views: string
+  thumbnail: string
+  publishedAt: string
+}
+
+type SearchSuccess = {
+  ok: true
+  videos: VideoSearchResult[]
+}
+
+type SearchError = {
+  ok: false
+  error: string
+}
+
+export type SearchResult = SearchSuccess | SearchError
+
+/**
+ * Search YouTube for recipe videos matching a query.
+ * Appends " recipe" to bias toward cooking content.
+ */
+export async function searchYouTubeRecipes(
+  query: string,
+  maxResults: number = 5,
+): Promise<SearchResult> {
+  try {
+    const yt = await getClient()
+    const searchQuery = query.toLowerCase().includes("recipe") ? query : `${query} recipe`
+    const results = await yt.search(searchQuery, { type: "video" })
+
+    if (!results.results || results.results.length === 0) {
+      return { ok: false, error: "No recipe videos found for this query. Try different keywords." }
+    }
+
+    const videos: VideoSearchResult[] = []
+
+    for (const item of results.results) {
+      if (videos.length >= maxResults) break
+
+      // Filter to Video nodes only
+      if (item.type !== "Video") continue
+      const video = item as YTNodes.Video
+
+      videos.push({
+        videoId: video.id,
+        title: video.title?.text ?? "Untitled",
+        channel: video.author?.name ?? "Unknown channel",
+        duration: video.duration?.text ?? "Unknown",
+        views: video.view_count?.text ?? "Unknown views",
+        thumbnail: video.best_thumbnail?.url ?? "",
+        publishedAt: video.published?.text ?? "",
+      })
+    }
+
+    if (videos.length === 0) {
+      return { ok: false, error: "No video results found. Try different search terms." }
+    }
+
+    return { ok: true, videos }
+  } catch (err) {
+    console.error("[youtube] Search failed:", err)
+    return {
+      ok: false,
+      error: `YouTube search failed: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
 }
 
 // ── Transcript Fetching & Caching ───────────────────────────────────────
@@ -47,6 +138,7 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 type TranscriptSuccess = {
   ok: true
   videoId: string
+  title: string
   transcript: string
   wordCount: number
   language: string | null
@@ -55,20 +147,17 @@ type TranscriptSuccess = {
 type TranscriptError = {
   ok: false
   error: string
-  details?: Array<{ lang: string; error: string }>
+  details?: Array<{ step: string; error: string }>
 }
 
 export type TranscriptResult = TranscriptSuccess | TranscriptError
 
 /**
- * Fetch a YouTube video transcript.
+ * Fetch a YouTube video transcript using youtubei.js (Innertube API).
  *
  * 1. Check `youtube_transcripts` DB table for a cached entry (7-day TTL).
- * 2. If miss, fetch from YouTube via `youtube-transcript` package.
+ * 2. If miss, fetch via Innertube: getInfo() → getTranscript().
  * 3. Join segments, truncate to MAX_WORDS, persist to DB.
- *
- * Accepts the authenticated Supabase client from the chat route
- * so that RLS policies are respected.
  */
 export async function fetchYouTubeTranscript(
   videoId: string,
@@ -88,6 +177,7 @@ export async function fetchYouTubeTranscript(
         return {
           ok: true,
           videoId,
+          title: "", // not stored in cache, AI will use transcript context
           transcript: cached.transcript,
           wordCount: cached.word_count,
           language: cached.language,
@@ -95,63 +185,91 @@ export async function fetchYouTubeTranscript(
       }
     }
 
-    // ── 2. Fetch from YouTube ──
-    let segments: Array<{ text: string }>
-    let detectedLang: string | null = null
-    const fetchErrors: Array<{ lang: string; error: string }> = []
+    // ── 2. Fetch from YouTube via Innertube ──
+    const yt = await getClient()
+    const fetchErrors: Array<{ step: string; error: string }> = []
 
+    let info
     try {
-      // Try English first
-      segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" })
-      detectedLang = "en"
-    } catch (enErr) {
-      const enMsg = enErr instanceof Error ? enErr.message : String(enErr)
-      fetchErrors.push({ lang: "en", error: enMsg })
-      try {
-        // Fallback: Hindi (common for Indian recipe content)
-        segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "hi" })
-        detectedLang = "hi"
-      } catch (hiErr) {
-        const hiMsg = hiErr instanceof Error ? hiErr.message : String(hiErr)
-        fetchErrors.push({ lang: "hi", error: hiMsg })
-        try {
-          // Final fallback: any available language
-          segments = await YoutubeTranscript.fetchTranscript(videoId)
-          detectedLang = null // unknown
-        } catch (fallbackErr) {
-          const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
-          fetchErrors.push({ lang: "auto", error: fbMsg })
-          return {
-            ok: false,
-            error:
-              "Could not extract transcript from this video. " +
-              "Errors: " +
-              fetchErrors.map((e) => `[${e.lang}] ${e.error}`).join(" | "),
-            details: fetchErrors,
-          }
-        }
-      }
-    }
-
-    if (!segments || segments.length === 0) {
-      console.warn(`[youtube] Transcript fetched but empty for ${videoId}`)
+      info = await yt.getInfo(videoId)
+    } catch (infoErr) {
+      const msg = infoErr instanceof Error ? infoErr.message : String(infoErr)
+      fetchErrors.push({ step: "getInfo", error: msg })
+      console.error(`[youtube] getInfo failed for ${videoId}:`, msg)
       return {
         ok: false,
-        error: "This video has no transcript/captions available.",
+        error: `Could not access this video. It may be private, deleted, or region-restricted. Error: ${msg}`,
+        details: fetchErrors,
       }
     }
 
-    // ── 3. Join & truncate ──
-    const fullText = segments
-      .map((s) => s.text.replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .join(" ")
+    const videoTitle = info.basic_info?.title ?? "Unknown"
 
+    let transcriptData
+    try {
+      transcriptData = await info.getTranscript()
+    } catch (txErr) {
+      const msg = txErr instanceof Error ? txErr.message : String(txErr)
+      fetchErrors.push({ step: "getTranscript", error: msg })
+      console.error(`[youtube] getTranscript failed for ${videoId}:`, msg)
+      return {
+        ok: false,
+        error:
+          `Could not extract transcript from "${videoTitle}". ` +
+          `This video may have captions disabled or unavailable. Error: ${msg}`,
+        details: fetchErrors,
+      }
+    }
+
+    // ── 3. Extract segments ──
+    const body = transcriptData?.transcript?.content?.body
+    const segments = body?.initial_segments ?? []
+
+    if (!segments || segments.length === 0) {
+      console.warn(`[youtube] Transcript fetched but has no segments for ${videoId}`)
+      return {
+        ok: false,
+        error: `Video "${videoTitle}" has no transcript/caption segments available.`,
+      }
+    }
+
+    // Extract text from each segment
+    const texts: string[] = []
+    let detectedLang: string | null = null
+
+    for (const seg of segments) {
+      if (seg.type === "TranscriptSegment") {
+        const node = seg as YTNodes.TranscriptSegment
+        const text = node.snippet?.text
+        if (text) texts.push(text.replace(/\s+/g, " ").trim())
+      }
+    }
+
+    // Try to detect language from transcript header
+    try {
+      const header = transcriptData?.transcript?.content?.header
+      if (header && header.type === "TranscriptSearchBox") {
+        // Language info may be in the header
+        detectedLang = null
+      }
+    } catch {
+      // Language detection is best-effort
+    }
+
+    if (texts.length === 0) {
+      return {
+        ok: false,
+        error: `Video "${videoTitle}" transcript segments could not be parsed.`,
+      }
+    }
+
+    // ── 4. Join & truncate ──
+    const fullText = texts.filter(Boolean).join(" ")
     const words = fullText.split(/\s+/)
     const truncated = words.length > MAX_WORDS ? words.slice(0, MAX_WORDS).join(" ") + " …" : fullText
     const wordCount = Math.min(words.length, MAX_WORDS)
 
-    // ── 4. Persist to DB (upsert) ──
+    // ── 5. Persist to DB (upsert) ──
     await supabase
       .from("youtube_transcripts")
       .upsert(
@@ -171,6 +289,7 @@ export async function fetchYouTubeTranscript(
     return {
       ok: true,
       videoId,
+      title: videoTitle,
       transcript: truncated,
       wordCount,
       language: detectedLang,
@@ -179,7 +298,7 @@ export async function fetchYouTubeTranscript(
     console.error("[youtube] Unexpected error:", err)
     return {
       ok: false,
-      error: "An unexpected error occurred while fetching the video transcript.",
+      error: `An unexpected error occurred while fetching the video transcript: ${err instanceof Error ? err.message : String(err)}`,
     }
   }
 }
