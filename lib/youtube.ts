@@ -97,39 +97,38 @@ export async function fetchYouTubeTranscript(
     // ── 2. Fetch from YouTube ──
     let segments: Array<{ text: string }>
     let detectedLang: string | null = null
+    const fetchErrors: string[] = []
 
     try {
       // Try English first
       segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" })
       detectedLang = "en"
     } catch (enErr) {
-      console.warn(
-        `[youtube] Failed to fetch English transcript for ${videoId}:`,
-        enErr instanceof Error ? enErr.message : enErr,
-      )
+      const enMsg = enErr instanceof Error ? enErr.message : String(enErr)
+      fetchErrors.push(`en: ${enMsg}`)
+      console.warn(`[youtube] Failed to fetch English transcript for ${videoId}:`, enMsg)
       try {
         // Fallback: Hindi (common for Indian recipe content)
         segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: "hi" })
         detectedLang = "hi"
       } catch (hiErr) {
-        console.warn(
-          `[youtube] Failed to fetch Hindi transcript for ${videoId}:`,
-          hiErr instanceof Error ? hiErr.message : hiErr,
-        )
+        const hiMsg = hiErr instanceof Error ? hiErr.message : String(hiErr)
+        fetchErrors.push(`hi: ${hiMsg}`)
+        console.warn(`[youtube] Failed to fetch Hindi transcript for ${videoId}:`, hiMsg)
         try {
           // Final fallback: any available language
           segments = await YoutubeTranscript.fetchTranscript(videoId)
           detectedLang = null // unknown
         } catch (fallbackErr) {
-          console.error(
-            `[youtube] All transcript fetches failed for ${videoId}:`,
-            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
-          )
+          const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+          fetchErrors.push(`any: ${fbMsg}`)
+          console.error(`[youtube] All transcript fetches failed for ${videoId}:`, fbMsg)
           return {
             ok: false,
             error:
               "Could not extract transcript from this video. " +
-              "It may have captions disabled, be private, or be region-restricted.",
+              "It may have captions disabled, be private, or be region-restricted. " +
+              `[Debug: ${fetchErrors.join(" | ")}]`,
           }
         }
       }
