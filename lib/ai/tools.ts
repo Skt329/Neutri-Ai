@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeTargets } from "@/lib/nutrition"
 import { getSwiggyAdapter, SwiggyNotConfiguredError } from "@/lib/swiggy/adapter"
 import { PANTRY_CATEGORIES, MEAL_TYPES, normalizeCategory } from "@/lib/categories"
+import { extractVideoId, fetchYouTubeTranscript } from "@/lib/youtube"
 
 /**
  * All tools NutriAI can call. Split into two groups:
@@ -424,6 +425,53 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         const { error } = await supabase.from("nutrition_targets").insert({ user_id: userId, ...input })
         if (error) return { ok: false as const, error: error.message }
         return { ok: true as const, targets: input }
+      },
+    }),
+
+    fetch_youtube_recipe: tool({
+      description:
+        "Extract the transcript from a YouTube video about cooking, recipes, or nutrition. " +
+        "Call this when the user pastes a YouTube link and asks about the recipe, ingredients, " +
+        "cooking steps, tips, or nutritional content of a food video. " +
+        "ONLY use for food/recipe/nutrition/cooking videos — refuse if the video is about " +
+        "an unrelated topic (the tool will flag non-food content). " +
+        "After receiving the transcript, answer the user's specific question from it. " +
+        "If the transcript is in a different language than the user's conversation, " +
+        "translate the recipe content into the user's language before responding.",
+      inputSchema: z.object({
+        url: z.string().url().describe("The YouTube video URL pasted by the user."),
+        question: z
+          .string()
+          .describe(
+            "What the user wants to know — e.g. 'full recipe with tips', 'list ingredients', " +
+            "'nutritional breakdown', 'cooking time'. Default to 'Provide the full recipe with detailed steps and tips'.",
+          ),
+      }),
+      execute: async ({ url, question }) => {
+        const videoId = extractVideoId(url)
+        if (!videoId) {
+          return {
+            ok: false as const,
+            error: "Invalid YouTube URL. Please paste a valid YouTube video link.",
+          }
+        }
+
+        const result = await fetchYouTubeTranscript(videoId, supabase)
+        if (!result.ok) return result
+
+        return {
+          ok: true as const,
+          videoId: result.videoId,
+          wordCount: result.wordCount,
+          language: result.language,
+          transcript: result.transcript,
+          instruction:
+            `Answer the user's question: "${question}" using ONLY the transcript above. ` +
+            "Format the recipe clearly with ingredients list, step-by-step instructions, and any tips mentioned. " +
+            "Estimate macros per serving if possible using your nutrition knowledge. " +
+            "If the transcript language differs from the user's conversation language, translate all content before responding. " +
+            "If the video is NOT about food/cooking/nutrition, tell the user you can only analyze food-related videos.",
+        }
       },
     }),
 
