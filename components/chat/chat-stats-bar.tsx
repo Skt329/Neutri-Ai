@@ -1,6 +1,6 @@
 'use client'
 
-import { Flame, Drumstick, Sparkles, Target } from 'lucide-react'
+import { Flame, Drumstick, Zap, Target } from 'lucide-react'
 
 interface ChatStatsBarProps {
   title: string | null
@@ -18,22 +18,41 @@ export function ChatStatsBar({
   goalLabel,
 }: ChatStatsBarProps) {
   return (
-    <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2.5 md:px-6">
-      <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
+    <div className="flex items-center gap-3 px-5 py-3">
+      <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-ink/80">
         {title || 'New chat'}
       </h1>
-      <div className="hidden md:flex items-center gap-2 shrink-0 ml-4">
+      <div className="hidden md:flex items-center gap-1.5 shrink-0">
         {caloriesLeft != null && (
-          <StatPill icon={<Flame className="size-3" />} value={`${Math.round(caloriesLeft)}`} label="kcal left" color="turmeric" />
+          <StatPill
+            icon={<Flame className="size-3" />}
+            value={`${Math.round(caloriesLeft)}`}
+            label="kcal"
+            colorClass="bg-turmeric-l text-turmeric"
+          />
         )}
         {proteinLeft != null && (
-          <StatPill icon={<Drumstick className="size-3" />} value={`${Math.round(proteinLeft)}`} label="g protein" color="sage" />
+          <StatPill
+            icon={<Drumstick className="size-3" />}
+            value={`${Math.round(proteinLeft)}g`}
+            label="protein"
+            colorClass="bg-mint text-forest"
+          />
         )}
         {streakDays > 0 && (
-          <StatPill icon={<Sparkles className="size-3" />} value={`Day ${streakDays}`} color="mint" />
+          <StatPill
+            icon={<Zap className="size-3" />}
+            value={`${streakDays}d`}
+            label="streak"
+            colorClass="bg-cream2 text-stone"
+          />
         )}
         {goalLabel && (
-          <StatPill icon={<Target className="size-3" />} value={goalLabel} color="cream" />
+          <StatPill
+            icon={<Target className="size-3" />}
+            value={goalLabel}
+            colorClass="bg-cream2 text-stone"
+          />
         )}
       </div>
     </div>
@@ -44,24 +63,18 @@ function StatPill({
   icon,
   value,
   label,
-  color,
+  colorClass,
 }: {
   icon: React.ReactNode
   value: string
   label?: string
-  color: 'turmeric' | 'sage' | 'mint' | 'cream'
+  colorClass: string
 }) {
-  const colorMap = {
-    turmeric: 'bg-turmeric-l text-turmeric',
-    sage: 'bg-mint text-forest',
-    mint: 'bg-mint text-forest',
-    cream: 'bg-cream2 text-stone',
-  }
   return (
-    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${colorMap[color]}`}>
+    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${colorClass}`}>
       {icon}
-      <span className="font-semibold">{value}</span>
-      {label && <span className="text-[10px] opacity-70">{label}</span>}
+      <span className="font-semibold tabular-nums">{value}</span>
+      {label && <span className="opacity-60">{label}</span>}
     </div>
   )
 }

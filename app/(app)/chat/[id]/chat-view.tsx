@@ -35,7 +35,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown } from "lucide-react"
+import {
+  ArrowLeft,
+  MoreVertical,
+  Send,
+  Square,
+  Trash2,
+  Pencil,
+  Leaf,
+  User,
+  Wrench,
+  Sparkles,
+  Check,
+  AlertCircle,
+  ChevronDown,
+  ArrowDown,
+} from "lucide-react"
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
 import { cn } from "@/lib/utils"
@@ -93,7 +108,6 @@ export function ChatView({
       router.refresh()
       if (!hadTitleRef.current) {
         hadTitleRef.current = true
-        // Delayed refresh to catch the async fire-and-forget title generation
         setTimeout(() => router.refresh(), 3000)
       }
     },
@@ -122,8 +136,6 @@ export function ChatView({
   const isAutoScrollingRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
 
-  // Detect touch device — on mobile, Enter inserts newline (send via button).
-  // On desktop, Enter sends (Shift+Enter for newline).
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)")
     setIsTouchDevice(mq.matches)
@@ -132,7 +144,6 @@ export function ChatView({
     return () => mq.removeEventListener("change", handler)
   }, [])
 
-  // Smart auto-scroll: batched with rAF to prevent jank during streaming
   useEffect(() => {
     if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
     scrollRafRef.current = requestAnimationFrame(() => {
@@ -142,7 +153,6 @@ export function ChatView({
       if (isNearBottom) {
         isAutoScrollingRef.current = true
         el.scrollTop = el.scrollHeight
-        // Clear auto-scroll flag after browser processes the scroll
         requestAnimationFrame(() => { isAutoScrollingRef.current = false })
       } else {
         setShowScrollDown(true)
@@ -151,7 +161,6 @@ export function ChatView({
     return () => { if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current) }
   }, [messages, status])
 
-  // Track scroll position — ignores programmatic auto-scrolls
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -176,7 +185,6 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && (status === "streaming" || status === "submitted")) {
@@ -247,20 +255,20 @@ export function ChatView({
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
-      {/* Mobile header (hidden on desktop where sidebar is visible) */}
-      <header className="flex md:hidden items-center gap-2 border-b border-border bg-card px-4 py-3">
-        <Button asChild variant="ghost" size="icon" aria-label="Back to chats" className="text-stone hover:text-forest">
+    <div className="flex flex-1 flex-col min-h-0 bg-background">
+      {/* ── Mobile header ── */}
+      <header className="flex md:hidden items-center gap-2 border-b border-border bg-card/80 backdrop-blur-sm px-4 py-3">
+        <Button asChild variant="ghost" size="icon" aria-label="Back to chats" className="text-stone hover:text-forest size-8">
           <Link href="/chat">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {title || "New chat"}
         </h1>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Chat options" className="text-stone hover:text-forest">
+            <Button variant="ghost" size="icon" aria-label="Chat options" className="text-stone hover:text-forest size-8">
               <MoreVertical className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -268,15 +276,15 @@ export function ChatView({
             <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
+            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 size-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
 
-      {/* Desktop stats bar (title + nutrition pills + menu) */}
-      <div className="hidden md:flex items-center border-b border-border bg-card">
+      {/* ── Desktop header ── */}
+      <div className="hidden md:flex items-center border-b border-border/60 bg-card/50 backdrop-blur-sm">
         <div className="flex-1 min-w-0">
           <ChatStatsBar
             title={title}
@@ -288,7 +296,7 @@ export function ChatView({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Chat options" className="text-stone hover:text-forest mr-2">
+            <Button variant="ghost" size="icon" aria-label="Chat options" className="text-stone hover:text-forest mr-3 size-8">
               <MoreVertical className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -296,35 +304,48 @@ export function ChatView({
             <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
+            <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 size-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Messages area — indicator is OUTSIDE scroll container */}
+      {/* ── Messages area ── */}
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto" style={{ contentVisibility: 'auto' }}>
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 md:px-6">
             {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
             {messages.map((m, idx) => (
-              <MemoizedMessageBubble key={m.id} message={m} addToolOutput={addToolOutput} isStreaming={status === "streaming"} isLast={idx === messages.length - 1} />
+              <MemoizedMessageBubble
+                key={m.id}
+                message={m}
+                addToolOutput={addToolOutput}
+                isStreaming={status === "streaming"}
+                isLast={idx === messages.length - 1}
+              />
             ))}
             {status === "submitted" ? (
-              <div className="flex items-center gap-2 text-sm text-stone animate-fade-in">
-                <Spinner className="size-4" /> Thinking…
+              <div className="flex items-center gap-2.5 text-sm text-stone animate-fade-in pl-1">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-mint">
+                  <Leaf className="size-3.5 text-forest" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-stone/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="size-1.5 rounded-full bg-stone/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="size-1.5 rounded-full bg-stone/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
               </div>
             ) : null}
             {error && status === "error" ? (
-              <div className="flex items-center gap-3 rounded-xl border border-clay/30 bg-clay/5 px-4 py-3 text-sm text-clay animate-fade-in">
+              <div className="flex items-center gap-3 rounded-2xl border border-clay/20 bg-clay/5 px-4 py-3 text-sm text-clay animate-fade-in">
                 <AlertCircle className="size-4 shrink-0" />
-                <span className="flex-1">Failed to get a response. Check your connection and try again.</span>
+                <span className="flex-1 text-clay/80">Failed to get a response. Check your connection and try again.</span>
                 {lastFailedInput ? (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="shrink-0 border-clay/30 text-clay hover:bg-clay/10"
+                    className="shrink-0 border-clay/25 text-clay hover:bg-clay/8 text-xs"
                     onClick={() => sendText(lastFailedInput)}
                   >
                     Retry
@@ -335,67 +356,72 @@ export function ChatView({
           </div>
         </div>
 
-        {/* Scroll-to-bottom — positioned relative to the wrapper, NOT inside scroll */}
+        {/* Scroll-to-bottom */}
         {showScrollDown && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-forest/90 text-white px-4 py-2 text-xs font-medium shadow-lg backdrop-blur-sm hover:bg-forest smooth-hover animate-fade-in"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-forest text-white px-4 py-2 text-xs font-medium shadow-lg hover:bg-sage smooth-hover animate-fade-in"
             aria-label="Scroll to latest messages"
           >
-            <ArrowDown className="size-3" /> New messages
+            <ArrowDown className="size-3" /> Latest
           </button>
         )}
       </div>
 
-      {/* Quick action chips */}
-      <QuickActions onPick={(prompt) => sendText(prompt)} />
+      {/* ── Quick actions + input area ── */}
+      <div className="border-t border-border/60 bg-card/50 backdrop-blur-sm">
+        <QuickActions onPick={(prompt) => sendText(prompt)} />
 
-      {/* Input bar */}
-      <form
-        onSubmit={onSubmit}
-        className="border-t border-border bg-card px-4 py-3 md:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
-      >
-        <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleTextareaChange}
-            onKeyDown={(e) => {
-              // Desktop: Enter sends, Shift+Enter newline
-              // Mobile: Enter always inserts newline (send via button)
-              if (e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
-                e.preventDefault()
-                if (!isStreaming) onSubmit(e)
-              }
-            }}
-            placeholder="Ask NutriAI anything…"
-            rows={1}
-            className="min-h-[48px] max-h-[160px] flex-1 resize-none rounded-2xl border-cream3 bg-cream2 placeholder:text-fog focus:border-sage focus:ring-sage/20"
-            aria-label="Type a message to NutriAI"
-          />
-          {isStreaming ? (
-            <Button
-              type="button"
-              size="icon"
-              onClick={() => stop()}
-              aria-label="Stop generating"
-              className="bg-clay hover:bg-clay/80 text-white rounded-full size-12 shrink-0"
-            >
-              <Square className="size-4" />
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!input.trim()}
-              aria-label="Send message"
-              className="bg-forest hover:bg-sage text-white rounded-full size-12 shrink-0"
-            >
-              <Send className="size-4" />
-            </Button>
-          )}
-        </div>
-      </form>
+        <form
+          onSubmit={onSubmit}
+          className="px-4 pb-4 pt-1 md:px-6 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
+        >
+          <div className="mx-auto flex w-full max-w-2xl items-end gap-2">
+            {/* Input wrapper with shadow */}
+            <div className="relative flex-1 rounded-2xl border border-border bg-card shadow-sm focus-within:border-sage/50 focus-within:shadow-md smooth-hover">
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={handleTextareaChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
+                    e.preventDefault()
+                    if (!isStreaming) onSubmit(e)
+                  }
+                }}
+                placeholder="Ask NutriAI anything…"
+                rows={1}
+                className="min-h-[44px] max-h-[160px] w-full resize-none border-0 bg-transparent px-4 py-3 text-sm placeholder:text-fog focus-visible:ring-0 focus-visible:outline-none"
+                aria-label="Type a message to NutriAI"
+              />
+            </div>
+            {isStreaming ? (
+              <Button
+                type="button"
+                size="icon"
+                onClick={() => stop()}
+                aria-label="Stop generating"
+                className="bg-clay hover:bg-clay/80 text-white rounded-xl size-11 shrink-0"
+              >
+                <Square className="size-3.5" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!input.trim()}
+                aria-label="Send message"
+                className="bg-forest hover:bg-sage disabled:opacity-30 text-white rounded-xl size-11 shrink-0"
+              >
+                <Send className="size-3.5" />
+              </Button>
+            )}
+          </div>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-[10px] text-fog/70">
+            NutriAI can make mistakes. Verify important nutrition info.
+          </p>
+        </form>
+      </div>
 
       {/* Rename Dialog */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
@@ -432,7 +458,7 @@ export function ChatView({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={actionPending} className="bg-clay hover:bg-clay/90 text-white">
+            <AlertDialogAction onClick={handleDelete} disabled={actionPending} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               {actionPending ? <><Spinner className="size-4 mr-1" /> Deleting…</> : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -442,41 +468,46 @@ export function ChatView({
   )
 }
 
-/* ── Suggestions (empty chat state) ── */
+/* ── Suggestions (empty state) ── */
 function Suggestions({ onPick }: { onPick: (text: string) => void }) {
   const suggestions = [
-    { title: "Log breakfast", body: "Two eggs, toast, and an avocado.", emoji: "🍳" },
-    { title: "Plan dinner", body: "Suggest a dinner using what's in my pantry.", emoji: "🍽️" },
-    { title: "Progress check", body: "How am I doing on protein today?", emoji: "💪" },
-    { title: "Add groceries", body: "Add rice, milk, spinach, and eggs to my pantry.", emoji: "🛒" },
+    { title: "Log breakfast", body: "Two eggs, toast, and an avocado.", icon: "🍳" },
+    { title: "Plan dinner", body: "Suggest a dinner using what's in my pantry.", icon: "🍽️" },
+    { title: "Progress check", body: "How am I doing on protein today?", icon: "💪" },
+    { title: "Add groceries", body: "Add rice, milk, spinach, and eggs to my pantry.", icon: "🛒" },
   ]
 
   return (
-    <div className="flex flex-col items-center gap-6 py-10 text-center">
-      <div className="relative">
-        <div className="absolute inset-0 bg-mint/40 rounded-full blur-xl" />
-        <div className="relative flex size-16 items-center justify-center rounded-full bg-forest text-white shadow-lg nutri-pulse-ring">
-          <Leaf className="size-7" />
+    <div className="flex flex-col items-center gap-8 py-12 text-center">
+      {/* Logo mark */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative">
+          <div className="absolute inset-0 bg-mint/50 rounded-full blur-2xl scale-150" />
+          <div className="relative flex size-14 items-center justify-center rounded-2xl bg-forest text-white shadow-lg nutri-pulse-ring">
+            <Leaf className="size-6" />
+          </div>
+        </div>
+        <div>
+          <h2 className="font-display text-2xl font-bold text-ink tracking-tight">How can I help?</h2>
+          <p className="text-sm text-stone/70 mt-1.5 max-w-xs leading-relaxed">
+            Log meals, manage your pantry, or get personalized nutrition advice.
+          </p>
         </div>
       </div>
-      <div>
-        <h2 className="font-display text-2xl font-bold text-ink">How can I help today?</h2>
-        <p className="text-sm text-stone mt-2">
-          Tell me what you ate, what you bought, or ask for a meal idea.
-        </p>
-      </div>
-      <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+
+      {/* Suggestion cards */}
+      <div className="grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
         {suggestions.map((s, i) => (
           <button
             key={s.title}
             onClick={() => onPick(s.body)}
-            className="group flex items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left smooth-hover hover:border-sage/30 hover:shadow-sm hover:-translate-y-0.5 animate-fade-in-up"
-            style={{ animationDelay: `${i * 80}ms` }}
+            className="group flex items-start gap-3 rounded-2xl border border-border bg-card/80 px-4 py-3.5 text-left smooth-hover hover:border-sage/25 hover:shadow-sm hover:-translate-y-0.5 animate-fade-in-up"
+            style={{ animationDelay: `${i * 70}ms` }}
           >
-            <span className="text-xl mt-0.5">{s.emoji}</span>
+            <span className="text-lg mt-0.5 leading-none">{s.icon}</span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-sage">{s.title}</p>
-              <p className="text-sm text-ink mt-0.5">{s.body}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-sage/70">{s.title}</p>
+              <p className="text-sm text-ink/75 mt-0.5 leading-snug">{s.body}</p>
             </div>
           </button>
         ))}
@@ -485,7 +516,7 @@ function Suggestions({ onPick }: { onPick: (text: string) => void }) {
   )
 }
 
-/* ── Message Bubble (memoized to prevent re-renders during streaming) ── */
+/* ── Message Bubble ── */
 function MessageBubble({
   message,
   addToolOutput,
@@ -501,57 +532,56 @@ function MessageBubble({
   const isAssistant = message.role === "assistant"
   if (!isUser && !isAssistant) return null
 
-  // Show streaming cursor on the last assistant message while streaming
   const showCursor = isStreaming && isLast && isAssistant
 
   return (
-    <div
-      className={cn(
-        "flex gap-3 animate-slide-up",
-        isUser ? "flex-row-reverse" : "flex-row"
-      )}
-    >
+    <div className={cn("flex gap-3 animate-slide-up", isUser ? "flex-row-reverse" : "flex-row")}>
+      {/* Avatar */}
       <div
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full text-sm",
-          isUser ? "bg-sage text-white" : "bg-mint text-forest"
+          "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold mt-0.5",
+          isUser
+            ? "bg-forest text-white"
+            : "bg-mint text-forest"
         )}
       >
-        {isUser ? <User className="size-4" /> : <Leaf className="size-4" />}
+        {isUser ? <User className="size-3.5" /> : <Leaf className="size-3.5" />}
       </div>
+
+      {/* Message content */}
       <div className={cn("flex min-w-0 flex-1 flex-col gap-2", isUser ? "items-end" : "items-start")}>
         {message.parts.map((part, i) => {
-          // Text parts
           if (part.type === "text") {
             if (!part.text?.trim()) return null
             return (
               <div
                 key={i}
                 className={cn(
-                  "max-w-[85ch] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                  "max-w-[80ch] px-4 py-3 text-sm leading-relaxed",
                   isUser
                     ? "bubble-user bg-forest text-white"
-                    : "bubble-ai bg-card text-ink border border-border"
+                    : "bubble-ai bg-card text-ink border border-border/70 shadow-sm"
                 )}
               >
-                {isUser ? part.text : <AssistantMarkdown text={part.text} />}
+                {isUser ? (
+                  <span className="text-white/95">{part.text}</span>
+                ) : (
+                  <AssistantMarkdown text={part.text} />
+                )}
                 {showCursor && i === message.parts.length - 1 && (
-                  <span className="inline-block w-[3px] h-[1.1em] bg-forest/70 ml-0.5 align-text-bottom animate-pulse" aria-hidden="true" />
+                  <span
+                    className="inline-block w-[2px] h-[1em] bg-forest/50 ml-0.5 align-text-bottom animate-pulse"
+                    aria-hidden="true"
+                  />
                 )}
               </div>
             )
           }
 
-          // Skip non-visible parts
           if (part.type === "reasoning" || part.type === "step-start" || (part.type as string) === "source") return null
 
-          // Tool invocation parts — handle both AI SDK v5 ("tool-invocation") and v6 ("tool-{name}") formats
           if (part.type === "tool-invocation" || (part.type.startsWith("tool-") && part.type !== "tool-invocation")) {
             const raw = part as any
-
-            // Live SDK v6: type is "tool-{toolName}", data at part level or in toolInvocation
-            // Live SDK v5: type is "tool-invocation", data in toolInvocation wrapper
-            // DB JSON: data may be flattened at the part level
             const inv = raw.toolInvocation ?? raw
             const toolName: string | undefined =
               inv.toolName ?? (part.type.startsWith("tool-") && part.type !== "tool-invocation"
@@ -593,7 +623,6 @@ function MessageBubble({
             return <ToolTrace key={i} part={toolPart} />
           }
 
-          // Catch-all: unknown part types — don't silently drop
           return null
         })}
       </div>
@@ -605,13 +634,8 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
   if (prev.message.id !== next.message.id) return false
   if (prev.isLast !== next.isLast) return false
   if (prev.isStreaming !== next.isStreaming) return false
-  // During streaming, the last message changes per token — must re-render
   if (next.isLast && next.isStreaming) return false
   if (prev.message.parts.length !== next.message.parts.length) return false
-  // Detect tool state/output changes (e.g. addToolOutput changing
-  // a part from "input-available" to "output-available" without
-  // changing parts count). Without this, the card stays interactive
-  // after the user confirms.
   for (let i = 0; i < prev.message.parts.length; i++) {
     const pp = prev.message.parts[i] as any
     const np = next.message.parts[i] as any
@@ -643,17 +667,15 @@ function ClientToolRenderer({
 }) {
   if (part.state === "input-streaming" || part.input == null) {
     return (
-      <div className="w-full max-w-[85ch] rounded-2xl border border-dashed border-ghost bg-cream2/50 px-4 py-3 text-xs text-stone">
-        <Spinner className="mr-2 inline size-3" /> Preparing…
+      <div className="w-full max-w-[80ch] rounded-2xl border border-border/50 bg-cream2/40 px-4 py-3 text-xs text-stone flex items-center gap-2">
+        <Spinner className="size-3" /> Preparing…
       </div>
     )
   }
 
   const hasOutput = part.state === "output-available" || part.state === "output-error"
   const output = hasOutput ? (part.output as unknown) : null
-
   const submit = (value: unknown) => {
-
     addToolOutput({ tool: toolName, toolCallId: part.toolCallId, output: value })
   }
 
@@ -679,7 +701,6 @@ function ToolTrace({ part }: { part: ToolUIPart }) {
   const isError = state === "output-error"
   const isRunning = state === "input-available"
 
-  // Compact output summary for the collapsed view
   const summary = isDone && part.output
     ? summarizeOutput(part.output)
     : isError
@@ -689,8 +710,8 @@ function ToolTrace({ part }: { part: ToolUIPart }) {
         : "Working…"
 
   return (
-    <details className="group w-full max-w-[85ch] rounded-xl border border-border/60 bg-cream2/40 text-xs smooth-hover hover:border-border">
-      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 list-none select-none [&::-webkit-details-marker]:hidden">
+    <details className="group w-full max-w-[80ch] rounded-xl border border-border/50 bg-cream2/30 text-xs smooth-hover hover:border-border/80 hover:bg-cream2/50">
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 list-none select-none [&::-webkit-details-marker]:hidden">
         {isDone ? (
           <span className="flex size-5 items-center justify-center rounded-full bg-mint text-forest">
             <Check className="size-3" />
@@ -700,23 +721,23 @@ function ToolTrace({ part }: { part: ToolUIPart }) {
             <AlertCircle className="size-3" />
           </span>
         ) : (
-          <Spinner className="size-4 text-stone" />
+          <Spinner className="size-4 text-stone/60" />
         )}
-        <span className="font-medium text-ink">{title}</span>
-        <span className="text-[11px] text-fog truncate flex-1">{summary}</span>
-        <ChevronDown className="size-3.5 text-stone smooth-hover group-open:rotate-180" />
+        <span className="font-medium text-ink/80">{title}</span>
+        <span className="text-[10px] text-fog truncate flex-1">{summary}</span>
+        <ChevronDown className="size-3 text-stone/50 smooth-hover group-open:rotate-180" />
       </summary>
       <div className="border-t border-border/40 px-3 py-2.5 space-y-2">
         {part.input ? (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-1">Input</p>
-            <pre className="overflow-x-auto rounded-lg bg-card p-2 text-[11px] leading-snug border border-border/60 max-h-[200px]">{JSON.stringify(part.input, null, 2)}</pre>
+            <pre className="overflow-x-auto rounded-lg bg-card p-2 text-[11px] leading-snug border border-border/50 max-h-[200px]">{JSON.stringify(part.input, null, 2)}</pre>
           </div>
         ) : null}
         {part.output !== undefined ? (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-fog mb-1">Result</p>
-            <pre className="overflow-x-auto rounded-lg bg-card p-2 text-[11px] leading-snug border border-border/60 max-h-[200px]">{JSON.stringify(part.output, null, 2)}</pre>
+            <pre className="overflow-x-auto rounded-lg bg-card p-2 text-[11px] leading-snug border border-border/50 max-h-[200px]">{JSON.stringify(part.output, null, 2)}</pre>
           </div>
         ) : null}
         {part.errorText ? <p className="text-clay text-xs">{part.errorText}</p> : null}
@@ -733,14 +754,14 @@ function summarizeOutput(output: unknown): string {
   if (!output || typeof output !== 'object') return ''
   const o = output as Record<string, unknown>
   if (o.ok === true) {
-    if (o.meal_id) return 'Meal logged ✓'
-    if (o.inserted && Array.isArray(o.inserted)) return `${o.inserted.length} item(s) added ✓`
-    if (o.updated) return 'Updated ✓'
+    if (o.meal_id) return 'Meal logged'
+    if (o.inserted && Array.isArray(o.inserted)) return `${o.inserted.length} item(s) added`
+    if (o.updated) return 'Updated'
     if (o.meals && Array.isArray(o.meals)) return `${o.meals.length} meal(s)`
     if (o.items && Array.isArray(o.items)) return `${o.items.length} item(s)`
     if (o.targets) return 'Targets loaded'
     if (o.totals) return 'Totals loaded'
-    return 'Done ✓'
+    return 'Done'
   }
   if (o.ok === false) return o.error ? String(o.error).slice(0, 40) : 'Failed'
   return ''
@@ -752,22 +773,22 @@ function AssistantMarkdown({ text }: { text: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
           ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>,
           li: ({ children }) => <li className="leading-relaxed">{children}</li>,
           strong: ({ children }) => <strong className="font-semibold text-forest">{children}</strong>,
-          em: ({ children }) => <em className="italic">{children}</em>,
+          em: ({ children }) => <em className="italic text-stone">{children}</em>,
           a: ({ children, href }) => (
             <a href={href} target="_blank" rel="noopener noreferrer" className="text-sage underline underline-offset-2 hover:no-underline">{children}</a>
           ),
-          code: ({ children }) => <code className="rounded bg-cream2 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
-          pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-lg bg-cream2 p-2 text-xs">{children}</pre>,
-          h1: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
-          h2: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
-          h3: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
-          hr: () => <div className="my-2 h-px bg-border" />,
-          blockquote: ({ children }) => <blockquote className="my-2 border-l-2 border-sage/30 pl-3 text-stone">{children}</blockquote>,
+          code: ({ children }) => <code className="rounded-md bg-cream2 px-1.5 py-0.5 font-mono text-[0.82em] text-ink/80">{children}</code>,
+          pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-xl bg-cream2 p-3 text-xs border border-border/50">{children}</pre>,
+          h1: ({ children }) => <p className="mb-1 font-semibold text-ink">{children}</p>,
+          h2: ({ children }) => <p className="mb-1 font-semibold text-ink">{children}</p>,
+          h3: ({ children }) => <p className="mb-0.5 font-medium text-ink">{children}</p>,
+          hr: () => <div className="my-3 h-px bg-border/60" />,
+          blockquote: ({ children }) => <blockquote className="my-2 border-l-2 border-sage/30 pl-3 italic text-stone/80">{children}</blockquote>,
         }}
       >
         {text}
