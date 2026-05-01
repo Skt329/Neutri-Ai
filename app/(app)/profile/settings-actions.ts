@@ -2,6 +2,7 @@
 
 import { z } from "zod"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { randomBytes } from "crypto"
 
@@ -69,9 +70,10 @@ export async function changePassword(
 }
 
 /* ── Sign out ── */
-export async function signOutAction(): Promise<never> {
+export async function signOutAction(): Promise<{ ok: false; error: string }> {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut()
+  if (error) return { ok: false, error: error.message }
   redirect("/auth/login")
 }
 
@@ -102,8 +104,14 @@ export async function shareChat(
     .eq("is_active", true)
     .maybeSingle()
 
+  // Derive origin from request headers (works in both dev and prod)
+  const hdrs = await headers()
+  const origin = hdrs.get("x-forwarded-proto") && hdrs.get("x-forwarded-host")
+    ? `${hdrs.get("x-forwarded-proto")}://${hdrs.get("x-forwarded-host")}`
+    : hdrs.get("origin") || hdrs.get("referer")?.replace(/\/[^/]*$/, "") || process.env.NEXT_PUBLIC_SITE_URL || ""
+
   if (existing) {
-    const url = `${process.env.NEXT_PUBLIC_SITE_URL || ""}/shared/${existing.token}`
+    const url = `${origin}/shared/${existing.token}`
     return { ok: true, token: existing.token, url }
   }
 
@@ -117,7 +125,7 @@ export async function shareChat(
   })
   if (error) return { ok: false, error: error.message }
 
-  const url = `${process.env.NEXT_PUBLIC_SITE_URL || ""}/shared/${token}`
+  const url = `${origin}/shared/${token}`
   return { ok: true, token, url }
 }
 

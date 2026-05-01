@@ -349,7 +349,7 @@ export function ChatView({
       {/* Messages area — indicator is OUTSIDE scroll container */}
       <div className="relative flex-1 min-h-0">
         <div ref={scrollRef} className="h-full overflow-y-auto" style={{ contentVisibility: 'auto' }}>
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-6">
             {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
             {messages.map((m, idx) => (
               <MemoizedMessageBubble key={m.id} message={m} addToolOutput={addToolOutput} isStreaming={status === "streaming"} isLast={idx === messages.length - 1} />
@@ -854,10 +854,11 @@ function CopyButton({ text, isUser }: { text: string; isUser: boolean }) {
     <button
       onClick={handleCopy}
       className={cn(
-        "absolute -bottom-1 right-1 translate-y-full flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium smooth-hover z-10",
-        "opacity-0 group-hover/msg:opacity-100 focus:opacity-100",
-        /* On mobile: always slightly visible */
-        "max-md:opacity-60 max-md:static max-md:translate-y-0 max-md:mt-1",
+        "flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium smooth-hover",
+        /* Desktop: show on hover, positioned inline at end of bubble */
+        "md:opacity-0 md:group-hover/msg:opacity-100 md:focus:opacity-100",
+        /* Mobile: always visible */
+        "mt-1",
         copied
           ? "bg-sage/10 text-sage"
           : isUser

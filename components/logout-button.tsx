@@ -17,10 +17,10 @@ export function LogoutButton({ variant = "button", className }: LogoutButtonProp
 
   const handleSignOut = useCallback(async () => {
     setPending(true)
-    try {
-      await signOutAction()
-    } catch {
-      toast.error("Failed to sign out")
+    const result = await signOutAction()
+    // signOutAction redirects on success; only reaches here on error
+    if (result && !result.ok) {
+      toast.error(result.error)
       setPending(false)
     }
   }, [])

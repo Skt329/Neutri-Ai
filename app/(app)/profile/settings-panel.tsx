@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useActionState, useEffect, useCallback } from "react"
+import { useFormStatus } from "react-dom"
 import { useTheme } from "next-themes"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
@@ -245,20 +245,13 @@ function AccountSection({ userEmail }: { userEmail: string }) {
 }
 
 function PasswordSubmitButton({ disabled }: { disabled: boolean }) {
-  const [pending, setPending] = useState(false)
-
-  // Track form pending state via useEffect on the DOM
-  useEffect(() => {
-    // Reset pending when component mounts (form resubmitted)
-    setPending(false)
-  }, [])
+  const { pending } = useFormStatus()
 
   return (
     <Button
       type="submit"
       size="sm"
       disabled={disabled || pending}
-      onClick={() => setPending(true)}
       className="bg-forest hover:bg-sage text-white gap-1.5"
     >
       {pending ? (
@@ -344,11 +337,10 @@ function SignOutSection() {
 
   const handleSignOut = useCallback(async () => {
     setPending(true)
-    try {
-      await signOutAction()
-    } catch {
-      // signOutAction redirects, so this only fires on actual errors
-      toast.error("Failed to sign out")
+    const result = await signOutAction()
+    // signOutAction redirects on success; only reaches here on error
+    if (result && !result.ok) {
+      toast.error(result.error)
       setPending(false)
     }
   }, [])
