@@ -1,9 +1,10 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { computeTargets } from "@/lib/nutrition"
+import { CACHE_TAGS } from "@/lib/supabase/queries"
 import type { ActivityLevel, CookingSkill, Goal, Sex } from "@/lib/types"
 
 const ProfileSchema = z.object({
@@ -91,8 +92,8 @@ export async function updateProfile(_prev: ActionState, formData: FormData): Pro
     .eq("id", user.id)
   if (error) return { ok: false, error: error.message }
 
-  revalidatePath("/profile")
-  revalidatePath("/dashboard")
+  // Bust profile cache — used by layout, dashboard, and profile page.
+  revalidateTag(CACHE_TAGS.profile, { expire: 0 })
   return { ok: true }
 }
 
@@ -131,7 +132,7 @@ export async function recomputeTargets(): Promise<ActionState> {
   const { error: insErr } = await supabase.from("nutrition_targets").insert({ user_id: user.id, ...t })
   if (insErr) return { ok: false, error: insErr.message }
 
-  revalidatePath("/profile")
-  revalidatePath("/dashboard")
+  // Bust targets cache — used by dashboard, meals, and profile pages.
+  revalidateTag(CACHE_TAGS.targets, { expire: 0 })
   return { ok: true }
 }

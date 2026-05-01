@@ -1,4 +1,5 @@
 import { getAuthUser } from "@/lib/supabase/auth"
+import { getCachedConversations } from "@/lib/supabase/queries"
 import { Leaf, Sparkles, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MobileConvoList } from "@/components/chat/mobile-convo-list"
@@ -8,8 +9,6 @@ export const metadata = {
   title: "Chat — NutriAI",
   description: "Start a conversation with your AI dietitian — log meals, get recipes, and track nutrition.",
 }
-
-export const dynamic = "force-dynamic"
 
 export default async function ChatIndexPage({
   searchParams,
@@ -32,13 +31,7 @@ export default async function ChatIndexPage({
     }
   }
 
-  // Fetch conversations server-side — use same limit as sidebar for parity
-  const { data: convos } = await supabase
-    .from("conversations")
-    .select("id, title, updated_at")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(50)
+  const convos = await getCachedConversations(user.id)
 
   return (
     <>
@@ -79,7 +72,7 @@ export default async function ChatIndexPage({
             </Link>
           </Button>
         </div>
-        <MobileConvoList conversations={convos ?? []} />
+        <MobileConvoList conversations={convos} />
       </div>
     </>
   )

@@ -117,7 +117,9 @@ export async function POST(req: Request) {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
   const lastUserText = lastUserMessage ? messageToText(lastUserMessage) : ""
 
-  const streakSince = new Date(Date.now() - 45 * 24 * 3600 * 1000).toISOString()
+  // 8-day window is sufficient for streak computation (consecutive days).
+  // The original 45-day scan fetched hundreds of unnecessary rows.
+  const streakSince = new Date(Date.now() - 8 * 24 * 3600 * 1000).toISOString()
   const [
     { data: profile },
     { data: targets },

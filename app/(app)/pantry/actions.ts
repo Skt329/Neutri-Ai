@@ -1,8 +1,9 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { CACHE_TAGS } from "@/lib/supabase/queries"
 
 const PantrySchema = z.object({
   name: z.string().min(1).max(80),
@@ -35,7 +36,7 @@ export async function addPantryItem(_prev: ActionState, formData: FormData): Pro
 
   const { error } = await supabase.from("pantry_items").insert({ user_id: user.id, ...parsed.data })
   if (error) return { ok: false, error: error.message }
-  revalidatePath("/pantry")
+  revalidateTag(CACHE_TAGS.pantry, { expire: 0 })
   return { ok: true }
 }
 
@@ -47,6 +48,6 @@ export async function deletePantryItem(id: string): Promise<ActionState> {
   if (!user) return { ok: false, error: "Not authenticated" }
   const { error } = await supabase.from("pantry_items").delete().eq("id", id).eq("user_id", user.id)
   if (error) return { ok: false, error: error.message }
-  revalidatePath("/pantry")
+  revalidateTag(CACHE_TAGS.pantry, { expire: 0 })
   return { ok: true }
 }

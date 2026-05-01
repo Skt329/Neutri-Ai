@@ -11,7 +11,8 @@ export const metadata = {
   description: "Order meals that fit your macros directly from Swiggy, powered by NutriAI.",
 }
 
-export const dynamic = "force-dynamic"
+// Revalidate periodically — connection status doesn't change on every request.
+export const revalidate = 60
 
 export default async function SwiggyPage() {
   const { user } = await getAuthUser()

@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
@@ -125,6 +125,7 @@ export async function submitOnboarding(_prev: OnboardingFormState, formData: For
   })
   if (targetsError) return { ok: false, error: `Could not save targets: ${targetsError.message}` }
 
-  revalidatePath("/dashboard")
+  revalidateTag("profile", { expire: 0 })
+  revalidateTag("targets", { expire: 0 })
   redirect("/dashboard")
 }

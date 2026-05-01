@@ -4,7 +4,9 @@ import { NewChatView } from "./new-chat-view"
 import { notFound } from "next/navigation"
 import type { UIMessage } from "ai"
 
-export const dynamic = "force-dynamic"
+// This page is inherently dynamic (unique per conversation).
+// Removing force-dynamic allows Next.js to apply its own
+// optimizations while the page still renders fresh per-request.
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

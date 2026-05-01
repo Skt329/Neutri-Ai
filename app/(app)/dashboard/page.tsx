@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { getAuthUser } from "@/lib/supabase/auth"
 import { getProfile } from "@/lib/supabase/profile"
+import { getCachedTargets, getCachedTodayMeals } from "@/lib/supabase/queries"
 import { Button } from "@/components/ui/button"
 import { CalorieRing } from "@/components/today/calorie-ring"
 import { MealSlotCard } from "@/components/today/meal-slot-card"
@@ -8,42 +9,26 @@ import { buildDeficitAlerts } from "@/lib/deficit-alerts"
 import { computeMealGap } from "@/lib/meal-gaps"
 import { sumTotals, startOfLocalDayISO } from "@/lib/nutrition"
 import { Sparkles, MessageCircle, Lightbulb } from "lucide-react"
-import type { MealLog, NutritionTargets, DeficitAlert } from "@/lib/types"
+import type { DeficitAlert } from "@/lib/types"
 
 export const metadata = {
   title: "Dashboard — NutriAI",
   description: "Today's nutrition overview — calories, macros, meal gaps, and AI-powered insights.",
 }
 
-export const dynamic = "force-dynamic"
-
 export default async function DashboardPage() {
-  const { user, supabase } = await getAuthUser()
+  const { user } = await getAuthUser()
   if (!user) return null
 
-  const [profile, { data: targets }] = await Promise.all([
-    getProfile(),
-    supabase
-      .from("nutrition_targets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle<NutritionTargets>(),
-  ])
-
+  const profile = await getProfile()
   const timezone = profile?.timezone || "UTC"
   const dayStart = startOfLocalDayISO(timezone)
 
-  const { data: todayMeals } = await supabase
-    .from("meal_logs")
-    .select("*")
-    .eq("user_id", user.id)
-    .gte("logged_at", dayStart)
-    .order("logged_at", { ascending: false })
-    .returns<MealLog[]>()
+  const [targets, mealsToday] = await Promise.all([
+    getCachedTargets(user.id),
+    getCachedTodayMeals(user.id, dayStart),
+  ])
 
-  const mealsToday: MealLog[] = todayMeals ?? []
   const totals = sumTotals(mealsToday)
 
   // Alerts

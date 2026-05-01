@@ -1,8 +1,9 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { CACHE_TAGS } from "@/lib/supabase/queries"
 
 const MealSchema = z.object({
   description: z.string().min(1),
@@ -41,8 +42,11 @@ export async function addMeal(_prev: ActionState, formData: FormData): Promise<A
     source: "manual",
   })
   if (error) return { ok: false, error: error.message }
-  revalidatePath("/meals")
-  revalidatePath("/dashboard")
+
+  // Surgically bust only the meals cache — dashboard + meals page
+  // will re-fetch from Supabase on next request, but profile/pantry
+  // caches remain untouched.
+  revalidateTag(CACHE_TAGS.meals, { expire: 0 })
   return { ok: true }
 }
 
@@ -54,7 +58,6 @@ export async function deleteMeal(id: string): Promise<ActionState> {
   if (!user) return { ok: false, error: "Not authenticated" }
   const { error } = await supabase.from("meal_logs").delete().eq("id", id).eq("user_id", user.id)
   if (error) return { ok: false, error: error.message }
-  revalidatePath("/meals")
-  revalidatePath("/dashboard")
+  revalidateTag(CACHE_TAGS.meals, { expire: 0 })
   return { ok: true }
 }

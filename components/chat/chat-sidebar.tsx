@@ -148,8 +148,9 @@ export function ChatSidebar({ conversations, userName, streakDays }: ChatSidebar
     setActionPending(true)
     try {
       await deleteConversation(deleteTarget.id)
-      router.refresh()
       setDeleteTarget(null)
+      router.push('/chat')
+      router.refresh()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Delete failed')
     } finally {

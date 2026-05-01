@@ -240,6 +240,7 @@ export function ChatView({
     setActionPending(true)
     try {
       await deleteConversation(conversationId)
+      router.push("/chat")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed")
       setActionPending(false)

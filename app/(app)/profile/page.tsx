@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { getAuthUser } from "@/lib/supabase/auth"
+import { getProfile } from "@/lib/supabase/profile"
+import { getCachedTargets, getCachedWeightLogs } from "@/lib/supabase/queries"
 import { ProfileSections } from "./profile-sections"
 import { RecomputeButton } from "./recompute-button"
 import { formatNumber } from "@/lib/format"
@@ -15,31 +16,18 @@ export const metadata = {
   description: "Manage your body metrics, dietary preferences, kitchen setup, and daily nutrition targets.",
 }
 
-export const dynamic = "force-dynamic"
-
 export default async function ProfilePage() {
-  const { user, supabase } = await getAuthUser()
+  const { user } = await getAuthUser()
   if (!user) return null
 
-  const [{ data: profile }, { data: targets }, { data: weights }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>(),
-    supabase
-      .from("nutrition_targets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle<NutritionTargets>(),
-    supabase
-      .from("weight_logs")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("logged_at", { ascending: false })
-      .limit(10)
-      .returns<WeightLog[]>(),
+  // Use getProfile() (request-scoped cached) for the profile, and the
+  // new tag-cached loaders for targets + weights — no raw duplicate queries.
+  const [profile, targets, recentWeights] = await Promise.all([
+    getProfile(),
+    getCachedTargets(user.id),
+    getCachedWeightLogs(user.id),
   ])
 
-  const recentWeights = weights ?? []
   const oldest = recentWeights[recentWeights.length - 1]
   const newest = recentWeights[0]
   const weightDelta =

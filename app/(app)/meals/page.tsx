@@ -2,9 +2,9 @@ import Link from "next/link"
 import { getAuthUser } from "@/lib/supabase/auth"
 import { Button } from "@/components/ui/button"
 import { MealsList } from "./meals-list"
+import { getCachedAllMeals, getCachedTargets } from "@/lib/supabase/queries"
 import { sumTotals } from "@/lib/nutrition"
 import { MessageCircle, Sparkles, Clock, Flame, Drumstick, Wheat, Droplet } from "lucide-react"
-import type { MealLog, NutritionTargets } from "@/lib/types"
 import { formatNumber } from "@/lib/format"
 
 export const metadata = {
@@ -12,33 +12,19 @@ export const metadata = {
   description: "Your complete food diary — log meals, track macros, and monitor daily nutrition targets.",
 }
 
-export const dynamic = "force-dynamic"
-
 export default async function MealsPage() {
-  const { user, supabase } = await getAuthUser()
+  const { user } = await getAuthUser()
   if (!user) return null
 
   const now = new Date()
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
 
-  const [{ data: meals }, { data: targets }] = await Promise.all([
-    supabase
-      .from("meal_logs")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("logged_at", { ascending: false })
-      .limit(200)
-      .returns<MealLog[]>(),
-    supabase
-      .from("nutrition_targets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle<NutritionTargets>(),
+  const [meals, targets] = await Promise.all([
+    getCachedAllMeals(user.id),
+    getCachedTargets(user.id),
   ])
 
-  const todays = (meals ?? []).filter((m) => m.logged_at >= dayStart)
+  const todays = meals.filter((m) => m.logged_at >= dayStart)
   const totals = sumTotals(todays)
 
   const macroStats = [
@@ -109,14 +95,14 @@ export default async function MealsPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="font-semibold text-ink">All meals</p>
-            <p className="text-xs text-fog">{meals?.length ?? 0} total · grouped by day</p>
+            <p className="text-xs text-fog">{meals.length} total · grouped by day</p>
           </div>
           <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-cream2 px-2.5 py-1 text-[11px] text-fog">
             <Clock className="size-3" />
             Gap warnings after 5h
           </div>
         </div>
-        <MealsList meals={meals ?? []} />
+        <MealsList meals={meals} />
       </div>
     </div>
   )

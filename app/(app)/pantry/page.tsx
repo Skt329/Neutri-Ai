@@ -3,28 +3,19 @@ import { getAuthUser } from "@/lib/supabase/auth"
 import { Button } from "@/components/ui/button"
 import { PantryList } from "./pantry-list"
 import { PantrySummary } from "./pantry-summary"
-import { MessageCircle, Plus, Search, Sparkles } from "lucide-react"
-import type { PantryItem } from "@/lib/types"
+import { getCachedPantryItems } from "@/lib/supabase/queries"
+import { MessageCircle, Sparkles } from "lucide-react"
 
 export const metadata = {
   title: "Pantry — NutriAI",
   description: "Manage your kitchen inventory — NutriAI uses your pantry to suggest meals you can cook.",
 }
 
-export const dynamic = "force-dynamic"
-
 export default async function PantryPage() {
-  const { user, supabase } = await getAuthUser()
+  const { user } = await getAuthUser()
   if (!user) return null
 
-  const { data: items } = await supabase
-    .from("pantry_items")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("name")
-    .returns<PantryItem[]>()
-
-  const pantry = items ?? []
+  const pantry = await getCachedPantryItems(user.id)
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-8">

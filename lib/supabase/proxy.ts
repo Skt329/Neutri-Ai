@@ -32,14 +32,19 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
+  // Use getSession() instead of getUser() for route guard checks.
+  // getSession() reads from the JWT cookie locally (no Supabase network call),
+  // saving ~100-150ms per navigation. The authoritative getUser() verification
+  // still happens in the RSC layout and API routes — the middleware only needs
+  // to know "is there a valid session cookie?" for redirect logic.
   let user = null
   try {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
+    const { data } = await supabase.auth.getSession()
+    user = data.session?.user ?? null
   } catch (err) {
     // Supabase auth can timeout on slow connections — don't crash the proxy.
     // Protected-route redirect will still fire (user stays null).
-    console.warn("[proxy] auth.getUser() failed:", err instanceof Error ? err.message : err)
+    console.warn("[proxy] auth.getSession() failed:", err instanceof Error ? err.message : err)
   }
 
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
