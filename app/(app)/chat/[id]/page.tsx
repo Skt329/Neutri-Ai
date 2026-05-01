@@ -1,7 +1,10 @@
 import { getAuthUser } from "@/lib/supabase/auth"
+import { getProfile } from "@/lib/supabase/profile"
+import { getCachedTargets, getCachedTodayMeals } from "@/lib/supabase/queries"
 import { ChatView } from "./chat-view"
 import { NewChatView } from "./new-chat-view"
 import { notFound } from "next/navigation"
+import { startOfLocalDayISO } from "@/lib/nutrition"
 import type { UIMessage } from "ai"
 
 // This page is inherently dynamic (unique per conversation).
@@ -20,11 +23,13 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     return <NewChatView />
   }
 
-  // Fetch conversation, messages, and nutrition data in parallel
-  const now = new Date()
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  // Fetch conversation + messages (unique to this page) alongside
+  // cached loaders that are already deduped with the layout render.
+  const profile = await getProfile()
+  const timezone = profile?.timezone || "UTC"
+  const dayStart = startOfLocalDayISO(timezone)
 
-  const [convoRes, msgsRes, mealsRes, targetsRes, profileRes] = await Promise.all([
+  const [convoRes, msgsRes, todayMeals, targets] = await Promise.all([
     supabase
       .from("conversations")
       .select("id, title")
@@ -37,23 +42,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       .eq("conversation_id", id)
       .order("ordinal", { ascending: true })
       .limit(200),
-    supabase
-      .from("meal_logs")
-      .select("calories, protein_g")
-      .eq("user_id", user.id)
-      .gte("logged_at", dayStart),
-    supabase
-      .from("nutrition_targets")
-      .select("calories, protein_g")
-      .eq("user_id", user.id)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("goal")
-      .eq("id", user.id)
-      .maybeSingle(),
+    getCachedTodayMeals(user.id, dayStart),
+    getCachedTargets(user.id),
   ])
 
   if (!convoRes.data) notFound()
@@ -110,10 +100,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   })
 
   // Compute nutrition remaining
-  const meals = mealsRes.data ?? []
-  const totalCal = meals.reduce((s, m) => s + (m.calories ?? 0), 0)
-  const totalPro = meals.reduce((s, m) => s + (m.protein_g ?? 0), 0)
-  const targets = targetsRes.data
+  const totalCal = todayMeals.reduce((s, m) => s + (m.calories ?? 0), 0)
+  const totalPro = todayMeals.reduce((s, m) => s + (m.protein_g ?? 0), 0)
   const caloriesLeft = targets ? targets.calories - totalCal : null
   const proteinLeft = targets ? targets.protein_g - totalPro : null
 
@@ -123,7 +111,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     maintain: 'Maintain',
     recomp: 'Recomp',
   }
-  const goalLabel = profileRes.data?.goal ? goalMap[profileRes.data.goal] ?? null : null
+  const goalLabel = profile?.goal ? goalMap[profile.goal] ?? null : null
 
   return (
     <ChatView
