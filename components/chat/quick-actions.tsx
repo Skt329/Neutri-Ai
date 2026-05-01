@@ -1,27 +1,22 @@
 'use client'
 
-
-
 const ACTIONS = [
-  { emoji: '🍽️', label: 'Log a meal', prompt: 'I want to log a meal' },
-  { emoji: '🛒', label: 'Order groceries', prompt: 'Add items to my pantry' },
-  { emoji: '📋', label: 'Suggest meal plan', prompt: 'Suggest a meal plan for today' },
-  { emoji: '📊', label: 'Check my progress', prompt: 'How am I doing today? Show me my daily totals' },
-  { emoji: '🔍', label: 'Find a recipe', prompt: 'Suggest a recipe from my pantry items' },
+  { label: 'Log a meal', prompt: 'I want to log a meal' },
+  { label: 'Update pantry', prompt: 'Add items to my pantry' },
+  { label: 'Meal plan', prompt: 'Suggest a meal plan for today' },
+  { label: 'My progress', prompt: 'How am I doing today? Show me my daily totals' },
+  { label: 'Find recipe', prompt: 'Suggest a recipe from my pantry items' },
 ] as const
 
 export function QuickActions({ onPick }: { onPick: (prompt: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-1.5 px-4 py-2 md:px-6">
+    <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-1 md:px-6 overflow-x-auto scrollbar-none">
       {ACTIONS.map((a) => (
         <button
           key={a.label}
-          onClick={() => {
-            onPick(a.prompt)
-          }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-stone hover:border-sage/30 hover:bg-cream2 hover:text-ink smooth-hover"
+          onClick={() => onPick(a.prompt)}
+          className="inline-flex items-center rounded-full border border-border/70 bg-card/80 px-3 py-1.5 text-[11px] font-medium text-stone/80 hover:border-sage/30 hover:bg-cream2/80 hover:text-ink smooth-hover whitespace-nowrap"
         >
-          <span>{a.emoji}</span>
           {a.label}
         </button>
       ))}

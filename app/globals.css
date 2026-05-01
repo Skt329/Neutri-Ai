@@ -75,13 +75,13 @@
   --radius: 0.875rem;
 
   /* ── Sidebar (used for history panel) ── */
-  --sidebar: var(--forest);
-  --sidebar-foreground: rgba(255,255,255,0.85);
+  --sidebar: #111510;
+  --sidebar-foreground: rgba(255,255,255,0.82);
   --sidebar-primary: var(--sage);
   --sidebar-primary-foreground: var(--white);
-  --sidebar-accent: rgba(255,255,255,0.08);
-  --sidebar-accent-foreground: rgba(255,255,255,0.75);
-  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-accent: rgba(255,255,255,0.06);
+  --sidebar-accent-foreground: rgba(255,255,255,0.70);
+  --sidebar-border: rgba(255,255,255,0.05);
   --sidebar-ring: var(--sage);
 
   /* ── Shadows ── */
