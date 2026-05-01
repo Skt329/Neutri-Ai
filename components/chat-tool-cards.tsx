@@ -394,14 +394,14 @@ export function ProposeMealCard({
               className="mt-1 font-semibold"
             />
           ) : (
-            <p className="mt-1 text-base font-semibold">{draft.description}</p>
+            <p className="mt-1 text-base font-semibold break-words">{draft.description}</p>
           )}
-          {draft.notes ? <p className="mt-1 text-xs text-muted-foreground">{draft.notes}</p> : null}
+          {draft.notes ? <p className="mt-1 text-xs text-muted-foreground break-words">{draft.notes}</p> : null}
         </div>
       </div>
 
       {/* Macros */}
-      <div className="mt-4 grid grid-cols-4 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(["calories", "protein_g", "carbs_g", "fat_g"] as const).map((k) => (
           <MacroInput
             key={k}
@@ -428,18 +428,18 @@ export function ProposeMealCard({
         ) : (
           <ul className="flex flex-col gap-1.5">
             {draft.items.map((it, i) => (
-              <li key={i} className="flex items-center gap-2">
+              <li key={i} className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   value={it.name}
                   onChange={(e) => updateItem(i, { name: e.target.value })}
                   placeholder="Item"
-                  className="h-8 flex-1"
+                  className="h-8 flex-1 min-w-0"
                 />
                 <Input
                   value={it.quantity ?? ""}
                   onChange={(e) => updateItem(i, { quantity: e.target.value || null })}
                   placeholder="qty"
-                  className="h-8 w-24"
+                  className="h-8 w-full sm:w-24"
                 />
                 <Button
                   type="button"
@@ -513,7 +513,7 @@ function MealSummary({ meal }: { meal: ProposeMealInput }) {
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           {MEAL_TYPE_META[meal.meal_type].label}
         </p>
-        <p className="mt-0.5 text-sm font-semibold">{meal.description}</p>
+        <p className="mt-0.5 text-sm font-semibold break-words">{meal.description}</p>
         <p className="mt-1 text-xs text-muted-foreground tabular-nums">
           {Math.round(meal.calories)} kcal · P {Math.round(meal.protein_g)}g · C {Math.round(meal.carbs_g)}g · F{" "}
           {Math.round(meal.fat_g)}g
@@ -647,7 +647,7 @@ function PantryDraftRow({
             className="h-8 flex-1 capitalize"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="number"
             inputMode="decimal"
@@ -655,16 +655,16 @@ function PantryDraftRow({
             value={item.quantity ?? ""}
             onChange={(e) => onPatch({ quantity: e.target.value === "" ? null : Number(e.target.value) })}
             placeholder="qty"
-            className="h-8 w-20"
+            className="h-8 w-16 sm:w-20"
           />
           <Input
             value={item.unit ?? ""}
             onChange={(e) => onPatch({ unit: e.target.value || null })}
             placeholder="unit"
-            className="h-8 w-20"
+            className="h-8 w-16 sm:w-20"
           />
           <Select value={item.category} onValueChange={(v) => onPatch({ category: v as PantryCategory })}>
-            <SelectTrigger className="h-8 w-32">
+            <SelectTrigger className="h-8 w-full sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -727,7 +727,7 @@ function PantryDraftRow({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
             <MacroInputMini
               label="kcal"
               value={item.calories_kcal}
