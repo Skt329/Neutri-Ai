@@ -57,7 +57,7 @@ export function MealSlotCard({ meal, type, index }: MealSlotCardProps) {
           <span className="text-xs text-fog tabular-nums">{time}</span>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-stone">{meta.label}</span>
         </div>
-        <p className="text-sm font-medium text-ink truncate mt-0.5">{meal.description}</p>
+        <p className="text-sm font-medium text-ink break-words mt-0.5">{meal.description}</p>
         {/* Macro dots */}
         <div className="flex items-center gap-3 mt-1.5 text-[11px] text-stone tabular-nums">
           {meal.protein_g != null && (

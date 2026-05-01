@@ -95,7 +95,7 @@ function MealRow({ meal, index }: { meal: MealLog; index: number }) {
           ) : null}
           <span className="text-xs text-fog">{formatTime(meal.logged_at)}</span>
         </div>
-        <p className="mt-1 truncate text-sm font-medium text-ink">{meal.description}</p>
+        <p className="mt-1 break-words text-sm font-medium text-ink">{meal.description}</p>
         <p className="text-xs text-stone tabular-nums mt-0.5">
           P {formatNumber(meal.protein_g)}g · C {formatNumber(meal.carbs_g)}g · F {formatNumber(meal.fat_g)}g
         </p>
