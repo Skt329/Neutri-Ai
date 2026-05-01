@@ -35,9 +35,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown } from "lucide-react"
+import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown, Copy, FileDown, Share2, Link2 } from "lucide-react"
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
+import { shareChat, revokeShare } from "../../profile/settings-actions"
 import { cn } from "@/lib/utils"
 
 import {
@@ -247,6 +248,35 @@ export function ChatView({
     }
   }
 
+  async function handleExportPDF() {
+    toast.info("Generating PDF…")
+    try {
+      const { generateChatPDF } = await import("@/lib/chat-pdf")
+      const textMessages = messages.filter(m => m.role === "user" || m.role === "assistant").map(m => ({
+        role: m.role as "user" | "assistant",
+        text: m.parts.filter((p): p is { type: "text"; text: string } => p.type === "text").map(p => p.text).join("\n"),
+      })).filter(m => m.text.trim())
+      await generateChatPDF(textMessages, title || "NutriAI Chat")
+      toast.success("PDF downloaded")
+    } catch (err) {
+      toast.error("Failed to generate PDF")
+    }
+  }
+
+  async function handleShare() {
+    try {
+      const result = await shareChat(conversationId)
+      if ("ok" in result && result.ok) {
+        await navigator.clipboard.writeText(result.url)
+        toast.success("Share link copied to clipboard")
+      } else if ("error" in result) {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Failed to create share link")
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col min-h-0">
       {/* Mobile header (hidden on desktop where sidebar is visible) */}
@@ -268,6 +298,12 @@ export function ChatView({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportPDF()}>
+              <FileDown className="mr-2 size-4" /> Export PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleShare()}>
+              <Share2 className="mr-2 size-4" /> Share link
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
               <Trash2 className="mr-2 size-4" /> Delete
@@ -296,6 +332,12 @@ export function ChatView({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => { setRenameValue(title ?? ""); setRenameOpen(true) }}>
               <Pencil className="mr-2 size-4" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExportPDF()}>
+              <FileDown className="mr-2 size-4" /> Export PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleShare()}>
+              <Share2 className="mr-2 size-4" /> Share link
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-clay focus:text-clay">
               <Trash2 className="mr-2 size-4" /> Delete
@@ -529,7 +571,7 @@ function MessageBubble({
               <div
                 key={i}
                 className={cn(
-                  "max-w-[85ch] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                  "group/msg relative max-w-[85ch] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
                   isUser
                     ? "bubble-user bg-forest text-white"
                     : "bubble-ai bg-card text-ink border border-border"
@@ -539,6 +581,7 @@ function MessageBubble({
                 {showCursor && i === message.parts.length - 1 && (
                   <span className="inline-block w-[3px] h-[1.1em] bg-forest/70 ml-0.5 align-text-bottom animate-pulse" aria-hidden="true" />
                 )}
+                <CopyButton text={part.text} isUser={isUser} />
               </div>
             )
           }
@@ -781,5 +824,53 @@ function AssistantMarkdown({ text }: { text: string }) {
         {text}
       </ReactMarkdown>
     </div>
+  )
+}
+
+/* ── Copy Button ── */
+function CopyButton({ text, isUser }: { text: string; isUser: boolean }) {
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const textarea = document.createElement("textarea")
+      textarea.value = text
+      textarea.style.position = "fixed"
+      textarea.style.opacity = "0"
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={cn(
+        "absolute -bottom-1 right-1 translate-y-full flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium smooth-hover z-10",
+        "opacity-0 group-hover/msg:opacity-100 focus:opacity-100",
+        /* On mobile: always slightly visible */
+        "max-md:opacity-60 max-md:static max-md:translate-y-0 max-md:mt-1",
+        copied
+          ? "bg-sage/10 text-sage"
+          : isUser
+            ? "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+            : "bg-cream2 text-stone hover:bg-cream3 hover:text-ink",
+      )}
+      aria-label="Copy message"
+    >
+      {copied ? (
+        <><Check className="size-3" /> Copied</>
+      ) : (
+        <><Copy className="size-3" /> Copy</>
+      )}
+    </button>
   )
 }
