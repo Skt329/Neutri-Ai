@@ -405,6 +405,8 @@ html {
 /* Prose for chat markdown */
 .prose-chat {
   line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .prose-chat p { margin-bottom: 0.5rem; }
 .prose-chat p:last-child { margin-bottom: 0; }

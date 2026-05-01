@@ -571,13 +571,13 @@ function MessageBubble({
               <div
                 key={i}
                 className={cn(
-                  "group/msg relative max-w-[85ch] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                  "group/msg relative max-w-[85ch] px-4 py-2.5 text-sm leading-relaxed shadow-sm break-words overflow-hidden",
                   isUser
                     ? "bubble-user bg-forest text-white"
                     : "bubble-ai bg-card text-ink border border-border"
                 )}
               >
-                {isUser ? part.text : <AssistantMarkdown text={part.text} />}
+                {isUser ? <span className="whitespace-pre-wrap break-words">{part.text}</span> : <AssistantMarkdown text={part.text} />}
                 {showCursor && i === message.parts.length - 1 && (
                   <span className="inline-block w-[3px] h-[1.1em] bg-forest/70 ml-0.5 align-text-bottom animate-pulse" aria-hidden="true" />
                 )}
@@ -799,7 +799,7 @@ function summarizeOutput(output: unknown): string {
 
 function AssistantMarkdown({ text }: { text: string }) {
   return (
-    <div className="prose-chat">
+    <div className="prose-chat overflow-hidden">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -810,10 +810,13 @@ function AssistantMarkdown({ text }: { text: string }) {
           strong: ({ children }) => <strong className="font-semibold text-forest">{children}</strong>,
           em: ({ children }) => <em className="italic">{children}</em>,
           a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" className="text-sage underline underline-offset-2 hover:no-underline">{children}</a>
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-sage underline underline-offset-2 hover:no-underline break-all">{children}</a>
           ),
-          code: ({ children }) => <code className="rounded bg-cream2 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
+          code: ({ children }) => <code className="rounded bg-cream2 px-1 py-0.5 font-mono text-[0.85em] break-all">{children}</code>,
           pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-lg bg-cream2 p-2 text-xs">{children}</pre>,
+          table: ({ children }) => <div className="overflow-x-auto -mx-1"><table className="min-w-full text-xs">{children}</table></div>,
+          th: ({ children }) => <th className="border-b border-border px-2 py-1 text-left font-semibold text-ink">{children}</th>,
+          td: ({ children }) => <td className="border-b border-border/50 px-2 py-1">{children}</td>,
           h1: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
           h2: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
           h3: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
