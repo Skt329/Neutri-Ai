@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -135,6 +135,7 @@ export function AskUserCard({
     for (const f of input.fields) init[f.name] = f.defaultValue ?? ""
     return init
   })
+  const submittedRef = useRef(false)
 
   if (output) {
     return (
@@ -161,6 +162,8 @@ export function AskUserCard({
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (submittedRef.current) return
+    submittedRef.current = true
     const out: Record<string, string | number> = {}
     for (const f of input.fields) {
       const raw = (values[f.name] ?? "").trim()
@@ -212,11 +215,12 @@ export function AskUserCard({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => onSubmit({ confirmed: false, values: {} })}
+            disabled={submittedRef.current}
+            onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: false, values: {} }) }}
           >
             Skip
           </Button>
-          <Button type="submit" size="sm">
+          <Button type="submit" size="sm" disabled={submittedRef.current}>
             <Check className="mr-1.5 size-4" /> Send
           </Button>
         </div>
@@ -237,6 +241,7 @@ export function ChooseOptionCard({
   onSubmit: (output: ChooseOptionOutput) => void
 }) {
   const [selected, setSelected] = useState<string[]>([])
+  const submittedRef = useRef(false)
 
   if (output) {
     return (
@@ -261,9 +266,11 @@ export function ChooseOptionCard({
   }
 
   function toggle(o: string) {
+    if (submittedRef.current) return
     if (input.multi) {
       setSelected((p) => (p.includes(o) ? p.filter((x) => x !== o) : [...p, o]))
     } else {
+      submittedRef.current = true
       onSubmit({ confirmed: true, selected: [o] })
     }
   }
@@ -296,14 +303,15 @@ export function ChooseOptionCard({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onSubmit({ confirmed: false, selected: [] })}
+            disabled={submittedRef.current}
+            onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: false, selected: [] }) }}
           >
             Skip
           </Button>
           <Button
             size="sm"
-            disabled={selected.length === 0}
-            onClick={() => onSubmit({ confirmed: true, selected })}
+            disabled={selected.length === 0 || submittedRef.current}
+            onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: true, selected }) }}
           >
             <Check className="mr-1.5 size-4" /> Send ({selected.length})
           </Button>
@@ -326,6 +334,7 @@ export function ProposeMealCard({
 }) {
   const [draft, setDraft] = useState<ProposeMealInput>(() => ({ ...input, items: [...input.items] }))
   const [editing, setEditing] = useState(false)
+  const submittedRef = useRef(false)
 
   if (output) {
     const meal = output.meal ?? input
@@ -452,17 +461,18 @@ export function ProposeMealCard({
       </div>
 
       <div className="mt-4 flex items-center justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setEditing((e) => !e)}>
+        <Button variant="ghost" size="sm" disabled={submittedRef.current} onClick={() => setEditing((e) => !e)}>
           {editing ? "Done editing" : "Edit name"}
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onSubmit({ confirmed: false, meal: null })}
+          disabled={submittedRef.current}
+          onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: false, meal: null }) }}
         >
           <X className="mr-1.5 size-4" /> Cancel
         </Button>
-        <Button size="sm" onClick={() => onSubmit({ confirmed: true, meal: draft })}>
+        <Button size="sm" disabled={submittedRef.current} onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: true, meal: draft }) }}>
           <Check className="mr-1.5 size-4" /> Log meal
         </Button>
       </div>
@@ -525,6 +535,7 @@ export function ProposePantryCard({
   onSubmit: (output: ProposePantryOutput) => void
 }) {
   const [items, setItems] = useState<ProposePantryInput["items"]>(() => input.items.map((it) => ({ ...it })))
+  const submittedRef = useRef(false)
 
   if (output) {
     return (
@@ -587,19 +598,22 @@ export function ProposePantryCard({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onSubmit({ confirmed: false, items: null })}
+          disabled={submittedRef.current}
+          onClick={() => { if (submittedRef.current) return; submittedRef.current = true; onSubmit({ confirmed: false, items: null }) }}
         >
           <X className="mr-1.5 size-4" /> Cancel
         </Button>
         <Button
           size="sm"
-          disabled={items.length === 0 || items.some((i) => !i.name.trim())}
-          onClick={() =>
+          disabled={items.length === 0 || items.some((i) => !i.name.trim()) || submittedRef.current}
+          onClick={() => {
+            if (submittedRef.current) return
+            submittedRef.current = true
             onSubmit({
               confirmed: true,
               items: items.map((it) => ({ ...it, name: it.name.trim() })),
             })
-          }
+          }}
         >
           <Sparkles className="mr-1.5 size-4" /> Add {items.length} item{items.length === 1 ? "" : "s"}
         </Button>

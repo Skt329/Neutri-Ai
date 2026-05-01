@@ -608,16 +608,23 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
   // During streaming, the last message changes per token — must re-render
   if (next.isLast && next.isStreaming) return false
   if (prev.message.parts.length !== next.message.parts.length) return false
-  // Detect tool state/output changes (e.g. addToolOutput changing
-  // a part from "input-available" to "output-available" without
-  // changing parts count). Without this, the card stays interactive
-  // after the user confirms.
+  // Deep-compare parts to detect all state transitions:
+  // - Text content changes (continuation text after tool calls)
+  // - Tool state changes (input-available → output-available)
+  // - Tool output appearing (state may remain same but result populated)
   for (let i = 0; i < prev.message.parts.length; i++) {
     const pp = prev.message.parts[i] as any
     const np = next.message.parts[i] as any
+    // Text content changed (catches continuation text updates)
+    if (pp.type === "text" && np.type === "text" && pp.text !== np.text) return false
+    // Tool state changed
     const pState = pp?.toolInvocation?.state ?? pp?.state
     const nState = np?.toolInvocation?.state ?? np?.state
     if (pState !== nState) return false
+    // Tool output appeared (state might be same but output populated)
+    const pHasOutput = !!(pp?.toolInvocation?.result ?? pp?.toolInvocation?.output ?? pp?.output)
+    const nHasOutput = !!(np?.toolInvocation?.result ?? np?.toolInvocation?.output ?? np?.output)
+    if (pHasOutput !== nHasOutput) return false
   }
   return true
 })
@@ -649,7 +656,7 @@ function ClientToolRenderer({
     )
   }
 
-  const hasOutput = part.state === "output-available" || part.state === "output-error"
+  const hasOutput = part.state === "output-available" || part.state === "output-error" || part.output != null
   const output = hasOutput ? (part.output as unknown) : null
 
   const submit = (value: unknown) => {
