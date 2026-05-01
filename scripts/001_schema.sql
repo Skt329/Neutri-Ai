@@ -192,10 +192,12 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "msg_select_own" ON public.messages;
 DROP POLICY IF EXISTS "msg_insert_own" ON public.messages;
+DROP POLICY IF EXISTS "msg_update_own" ON public.messages;
 DROP POLICY IF EXISTS "msg_delete_own" ON public.messages;
 
 CREATE POLICY "msg_select_own" ON public.messages FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "msg_insert_own" ON public.messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "msg_update_own" ON public.messages FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "msg_delete_own" ON public.messages FOR DELETE USING (auth.uid() = user_id);
 
 ---------------------------------------------------------------------

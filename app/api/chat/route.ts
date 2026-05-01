@@ -228,13 +228,7 @@ export async function POST(req: Request) {
   return result.toUIMessageStreamResponse({
     originalMessages: messages,
     async onFinish({ messages: finishedMessages }) {
-      console.log("[chat] onFinish — message count:", finishedMessages.length)
-
       try {
-        // ── Robust append-only persistence ──
-        // Query the current count of saved messages (not ordinals) and the
-        // max ordinal. We use the count to determine which messages from
-        // the SDK's array are new, and max ordinal for sequential assignment.
         const { count, data: ordinalRow } = await supabase
           .from("messages")
           .select("ordinal", { count: "exact", head: false })
@@ -260,13 +254,8 @@ export async function POST(req: Request) {
           }
         }
 
-        // ── Update last pre-existing message if its parts have grown ──
-        // Multi-step tool flows (propose → confirm → log → follow-up text)
-        // add new parts to the EXISTING assistant message. The insert above
-        // only captures NEW messages, so we must also update the last saved
-        // message to persist tool outputs and continuation text.
-        // Skip the update for plain text messages (no tool parts) to avoid
-        // a wasted DB write on ~80% of requests.
+        // Update last pre-existing message if its parts have grown
+        // (e.g. tool output + follow-up text added after user confirmation)
         if (savedCount > 0 && finishedMessages.length >= savedCount) {
           const lastPreExisting = finishedMessages[savedCount - 1]
           const hasToolParts = lastPreExisting.parts.some(

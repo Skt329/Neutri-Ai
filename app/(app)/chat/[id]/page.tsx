@@ -64,22 +64,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     const parts = (r.parts as any[]) ?? []
     const isLastMessage = msgIndex === rawMessages.length - 1
 
-    // DEBUG: log raw DB parts for client tools
-    parts.forEach((p: any, pi: number) => {
-      const inv = p.toolInvocation ?? p
-      const tn = inv.toolName ?? (typeof p.type === "string" && p.type.startsWith("tool-") ? p.type.replace(/^tool-/, "") : undefined)
-      if (tn && CLIENT_TOOLS.includes(tn)) {
-        console.log(`[DEBUG] msg ${msgIndex} part ${pi}:`, JSON.stringify({
-          type: p.type,
-          hasToolInvocation: !!p.toolInvocation,
-          state: inv.state ?? p.state,
-          hasResult: inv.result !== undefined,
-          hasOutput: inv.output !== undefined || p.output !== undefined,
-          isLastMessage,
-          totalParts: parts.length,
-        }))
-      }
-    })
 
     const fixedParts = parts.map((part: any, partIndex: number) => {
       const inv = part.toolInvocation ?? part
