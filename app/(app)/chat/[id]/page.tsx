@@ -64,7 +64,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     const parts = (r.parts as any[]) ?? []
     const isLastMessage = msgIndex === rawMessages.length - 1
 
-    const fixedParts = parts.map((part: any) => {
+    const fixedParts = parts.map((part: any, partIndex: number) => {
       const inv = part.toolInvocation ?? part
       const toolName: string | undefined =
         inv.toolName ??
@@ -77,12 +77,19 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       const hasOutput = inv.state === "result" || inv.state === "output-available" || inv.result !== undefined || inv.output !== undefined
       if (hasOutput) return part
 
-      if (!isLastMessage) {
+      // Determine if this tool invocation was already handled:
+      // 1. It's NOT the last message (a follow-up message exists) → definitely resolved
+      // 2. It IS the last message but subsequent parts exist after this tool part
+      //    (e.g. a text continuation like "I've logged your meal...") → resolved
+      const hasSubsequentParts = partIndex < parts.length - 1 &&
+        parts.slice(partIndex + 1).some((p: any) => p.type === "text" && p.text?.trim())
+
+      if (!isLastMessage || hasSubsequentParts) {
         const fixed = { ...part }
         if (fixed.toolInvocation) {
-          fixed.toolInvocation = { ...fixed.toolInvocation, state: "result", result: { confirmed: true } }
+          fixed.toolInvocation = { ...fixed.toolInvocation, state: "output-available", output: { confirmed: true }, result: { confirmed: true } }
         } else {
-          fixed.state = "result"
+          fixed.state = "output-available"
           fixed.result = { confirmed: true }
           fixed.output = { confirmed: true }
         }
