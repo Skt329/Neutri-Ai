@@ -58,7 +58,7 @@ export function buildAuthorizeUrl(params: {
   redirectUri: string
   codeChallenge: string
   scopes?: string[]
-}): string {
+}): { url: string; state: string } {
   const url = new URL(AUTHORIZE_ENDPOINT)
   url.searchParams.set("response_type", "code")
   url.searchParams.set("client_id", params.clientId)
