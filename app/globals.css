@@ -303,6 +303,11 @@
   50% { transform: translateY(-3px); }
 }
 
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+
 @layer utilities {
   .animate-fade-in-up {
     animation: fade-in-up 0.5s ease-out both;
@@ -342,6 +347,15 @@
   }
   .smooth-hover {
     @apply transition-all duration-200 ease-out;
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+  .hero-gradient-text {
+    background: linear-gradient(135deg, var(--sage) 0%, var(--turmeric) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   @media (prefers-reduced-motion: reduce) {

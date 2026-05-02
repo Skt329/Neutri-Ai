@@ -336,6 +336,8 @@ function AppearanceSection() {
    SWIGGY CONNECTION SECTION
    ════════════════════════════════════════════════════════════════ */
 
+const IS_DEV = process.env.NODE_ENV === "development"
+
 function SwiggyConnectionSection() {
   const [status, setStatus] = useState<{
     connected: boolean
@@ -403,7 +405,7 @@ function SwiggyConnectionSection() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-ink">Swiggy</h3>
             {!loading && (
               <Badge
@@ -418,6 +420,12 @@ function SwiggyConnectionSection() {
                 {status?.connected ? "Connected" : "Not connected"}
               </Badge>
             )}
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 border-turmeric/40 text-turmeric bg-turmeric/5"
+            >
+              Under Development
+            </Badge>
           </div>
           <p className="text-[11px] text-stone">
             Order food & groceries with nutrition tracking
@@ -430,6 +438,15 @@ function SwiggyConnectionSection() {
           <AlertTriangle className="size-3.5 text-turmeric shrink-0" />
           <p className="text-[11px] text-turmeric">
             Connection expires soon. Reconnect to continue ordering.
+          </p>
+        </div>
+      )}
+
+      {!IS_DEV && !status?.connected && (
+        <div className="flex items-center gap-2 mb-4 rounded-lg bg-turmeric/10 border border-turmeric/20 px-3 py-2">
+          <AlertTriangle className="size-3.5 text-turmeric shrink-0" />
+          <p className="text-[11px] text-turmeric">
+            Swiggy integration is under active development and not yet available in production.
           </p>
         </div>
       )}
@@ -455,12 +472,17 @@ function SwiggyConnectionSection() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleConnect}
-            disabled={actionPending}
-            className="gap-2 text-xs border-sage/40 text-sage hover:bg-sage/5 hover:text-sage"
+            onClick={IS_DEV ? handleConnect : undefined}
+            disabled={actionPending || !IS_DEV}
+            className={cn(
+              "gap-2 text-xs",
+              IS_DEV
+                ? "border-sage/40 text-sage hover:bg-sage/5 hover:text-sage"
+                : "border-border text-fog cursor-not-allowed opacity-60",
+            )}
           >
             {actionPending ? <Spinner className="size-3.5" /> : <Link2 className="size-3.5" />}
-            Connect Swiggy
+            {IS_DEV ? "Connect Swiggy" : "Coming Soon"}
           </Button>
         )}
       </div>
