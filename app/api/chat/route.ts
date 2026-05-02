@@ -2,13 +2,15 @@ import { convertToModelMessages, generateText, hasToolCall, stepCountIs, streamT
 import { azureChatModel } from "@/lib/ai/azure-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildTools, CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
+import { buildTools, buildSwiggySmartTools, CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
 import { buildSystemPrompt } from "@/lib/ai/system-prompt"
 import { retrieveMemories } from "@/lib/ai/memory"
 import type { NutritionTargets, Profile } from "@/lib/types"
 import { sumTotals } from "@/lib/nutrition"
 import { computeStreakInfo } from "@/lib/streaks"
 import { computeMealGap } from "@/lib/meal-gaps"
+import { getValidToken, getSwiggyConnectionStatus } from "@/lib/swiggy/mcp/token-manager"
+import { getSwiggyMCPTools } from "@/lib/swiggy/mcp/client"
 
 // Use Node.js runtime for more reliable Supabase connectivity.
 // Edge runtime has stricter fetch timeout behavior that causes
@@ -184,6 +186,35 @@ export async function POST(req: Request) {
     })),
     now,
   )
+  // ── Swiggy MCP integration (conditional) ──
+  let swiggyTools: Record<string, any> = {}
+  let swiggyConnected = false
+  let swiggyExpiringSoon = false
+  let swiggyCleanup: (() => Promise<void>) | null = null
+  try {
+    const swiggyToken = await getValidToken(supabase, user.id)
+    if (swiggyToken) {
+      swiggyConnected = true
+      const swiggyStatus = await getSwiggyConnectionStatus(supabase, user.id)
+      swiggyExpiringSoon = swiggyStatus.expiringSoon
+      // MCP discovery with 8s timeout to prevent blocking on slow Swiggy servers
+      const mcpResult = await Promise.race([
+        getSwiggyMCPTools(swiggyToken),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("MCP discovery timeout (8s)")), 8000),
+        ),
+      ])
+      swiggyTools = mcpResult.tools
+      swiggyCleanup = mcpResult.cleanup
+      console.log(`[chat] Swiggy MCP: ${Object.keys(mcpResult.tools).length} tools loaded`)
+      if (mcpResult.errors.length > 0) {
+        console.warn("[chat] Swiggy MCP partial failures:", mcpResult.errors)
+      }
+    }
+  } catch (err) {
+    console.warn("[chat] Swiggy MCP init failed (non-blocking):", err instanceof Error ? err.message : err)
+  }
+
   const system = buildSystemPrompt({
     profile,
     targets,
@@ -192,12 +223,46 @@ export async function POST(req: Request) {
     currentDateISO: now.toISOString(),
     streak,
     mealGapHours: gap?.hours ?? null,
+    swiggyConnected,
+    swiggyExpiringSoon,
   })
 
-  const tools = buildTools(supabase, user.id)
+  // Build core tools — when MCP is connected, exclude legacy adapter tools (MCP supersedes them)
+  const coreTools = buildTools(supabase, user.id)
+  if (swiggyConnected) {
+    delete (coreTools as Record<string, unknown>).swiggy_search
+    delete (coreTools as Record<string, unknown>).swiggy_get_menu
+    delete (coreTools as Record<string, unknown>).swiggy_place_order
+  }
+
+  // Pre-loaded dietary context for smart tools (avoids redundant DB queries)
+  const preloadedCtx = {
+    profile: profile
+      ? {
+          dietary_preferences: profile.dietary_preferences ?? [],
+          allergies: profile.allergies ?? [],
+          health_conditions: profile.health_conditions ?? [],
+        }
+      : null,
+    targets: targets
+      ? {
+          calories: targets.calories,
+          protein_g: targets.protein_g,
+          carbs_g: targets.carbs_g,
+          fat_g: targets.fat_g,
+        }
+      : null,
+    dailyTotals: totals,
+  }
+
+  const tools = {
+    ...coreTools,
+    ...(swiggyConnected ? buildSwiggySmartTools(supabase, user.id, preloadedCtx) : {}),
+    ...swiggyTools,
+  }
 
   const result = streamText({
-    // Azure OpenAI: GPT-4.1 — native tool calling, structured output, fast.
+    // Azure OpenAI: GPT-4.1 mini — native tool calling, parallel tool calls, structured output.
     model: azureChatModel,
     maxOutputTokens: 4096,
     system,
@@ -303,6 +368,11 @@ export async function POST(req: Request) {
         // (POST /api/cron/extract-memories) — no inline extraction here.
       } catch (e) {
         console.error("[chat] Failed to persist messages:", e)
+      } finally {
+        // Release Swiggy MCP connections after stream is done
+        if (swiggyCleanup) {
+          swiggyCleanup().catch(() => {})
+        }
       }
     },
   })

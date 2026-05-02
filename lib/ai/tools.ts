@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeTargets } from "@/lib/nutrition"
 import { getSwiggyAdapter, SwiggyNotConfiguredError } from "@/lib/swiggy/adapter"
 import { PANTRY_CATEGORIES, MEAL_TYPES, normalizeCategory } from "@/lib/categories"
+export { buildSwiggySmartTools } from "@/lib/ai/tools/swiggy-smart"
 
 /**
  * All tools NutriAI can call. Split into two groups:
@@ -119,6 +120,104 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         "using common reference values. Prefer per_100g for solids and per_100ml for liquids; use per_piece only for naturally countable items (eggs, bananas).",
       inputSchema: z.object({
         items: z.array(PantryItemInput).min(1).max(20),
+      }),
+    }),
+
+    // ─── Swiggy client tools (interactive cards) ──────────────────────────────
+
+    propose_swiggy_order: tool({
+      description:
+        "Show an interactive order review card with nutrition overlay. " +
+        "Shows items, prices, estimated macros per item, running total vs daily targets, and confirm/cancel buttons. " +
+        "ALWAYS call nutrition_aware_checkout first to get the data, then pass the result to this card.",
+      inputSchema: z.object({
+        restaurant_name: z.string(),
+        items: z.array(z.object({
+          name: z.string(),
+          quantity: z.number().int().min(1),
+          price: z.number(),
+          estimated_calories: z.number().nullable(),
+          estimated_protein_g: z.number().nullable(),
+          estimated_carbs_g: z.number().nullable(),
+          estimated_fat_g: z.number().nullable(),
+        })).min(1),
+        delivery_fee: z.number().default(0),
+        total_price: z.number(),
+        estimated_eta: z.number().nullable().describe("ETA in minutes"),
+        order_nutrition: z.object({
+          calories: z.number(),
+          protein_g: z.number(),
+          carbs_g: z.number(),
+          fat_g: z.number(),
+        }),
+        remaining_after_order: z.object({
+          calories: z.number(),
+          protein_g: z.number(),
+          carbs_g: z.number(),
+          fat_g: z.number(),
+        }).nullable(),
+      }),
+    }),
+
+    propose_restaurant_pick: tool({
+      description:
+        "Show selectable restaurant cards so the user can pick where to order from. " +
+        "Each card shows name, rating, ETA, cuisines, and dietary compatibility.",
+      inputSchema: z.object({
+        restaurants: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          cuisines: z.array(z.string()).default([]),
+          rating: z.number().nullable(),
+          eta_minutes: z.number().nullable(),
+          is_veg: z.boolean().default(false),
+          price_for_two: z.number().nullable(),
+        })).min(1).max(8),
+        prompt: z.string().default("Pick a restaurant"),
+      }),
+    }),
+
+    propose_menu_selection: tool({
+      description:
+        "Show menu items with nutrition estimates so the user can select items and quantities. " +
+        "Each item shows name, price, veg badge, and estimated macros.",
+      inputSchema: z.object({
+        restaurant_name: z.string(),
+        restaurant_id: z.string(),
+        items: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          price: z.number(),
+          is_veg: z.boolean().default(false),
+          description: z.string().nullable(),
+          estimated_calories: z.number().nullable(),
+          estimated_protein_g: z.number().nullable(),
+          estimated_carbs_g: z.number().nullable(),
+          estimated_fat_g: z.number().nullable(),
+        })).min(1).max(30),
+      }),
+    }),
+
+    propose_pantry_restock: tool({
+      description:
+        "Show a restock card with pantry gaps matched to Instamart products. " +
+        "Left panel: low/expired pantry items. Right panel: matched Instamart products with prices. " +
+        "User can select which items to add to cart.",
+      inputSchema: z.object({
+        restock_items: z.array(z.object({
+          pantry_item_name: z.string(),
+          pantry_quantity_left: z.number().nullable(),
+          pantry_unit: z.string().nullable(),
+          is_expired: z.boolean().default(false),
+          instamart_match: z.object({
+            product_id: z.string(),
+            name: z.string(),
+            price: z.number(),
+            unit: z.string().nullable(),
+            quantity: z.number().nullable(),
+          }).nullable(),
+        })).min(1),
+        total_estimated_price: z.number(),
       }),
     }),
 
@@ -583,5 +682,14 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
  * Toolset names by category. Used by the client view to decide which tool
  * parts render as interactive cards and which render as collapsible traces.
  */
-export const CLIENT_TOOL_NAMES = ["ask_user", "choose_option", "propose_meal_log", "propose_pantry_items"] as const
+export const CLIENT_TOOL_NAMES = [
+  "ask_user",
+  "choose_option",
+  "propose_meal_log",
+  "propose_pantry_items",
+  "propose_swiggy_order",
+  "propose_restaurant_pick",
+  "propose_menu_selection",
+  "propose_pantry_restock",
+] as const
 export type ClientToolName = (typeof CLIENT_TOOL_NAMES)[number]

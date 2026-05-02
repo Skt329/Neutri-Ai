@@ -56,6 +56,20 @@ import {
   type ProposePantryOutput,
 } from "@/components/chat-tool-cards"
 import { CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
+import {
+  SwiggyOrderReviewCard,
+  RestaurantPickerCard,
+  MenuSelectorCard,
+  PantryRestockCard,
+  type SwiggyOrderInput,
+  type SwiggyOrderOutput,
+  type RestaurantPickInput,
+  type RestaurantPickOutput,
+  type MenuSelectionInput,
+  type MenuSelectionOutput,
+  type PantryRestockInput,
+  type PantryRestockOutput,
+} from "@/components/swiggy/tool-cards"
 import { ChatStatsBar } from "@/components/chat/chat-stats-bar"
 import { QuickActions } from "@/components/chat/quick-actions"
 
@@ -717,6 +731,14 @@ function ClientToolRenderer({
       return <ProposeMealCard input={part.input as unknown as ProposeMealInput} output={output as ProposeMealOutput | null} onSubmit={submit} />
     case "propose_pantry_items":
       return <ProposePantryCard input={part.input as unknown as ProposePantryInput} output={output as ProposePantryOutput | null} onSubmit={submit} />
+    case "propose_swiggy_order":
+      return <SwiggyOrderReviewCard input={part.input as unknown as SwiggyOrderInput} output={output as SwiggyOrderOutput | null} onSubmit={submit} />
+    case "propose_restaurant_pick":
+      return <RestaurantPickerCard input={part.input as unknown as RestaurantPickInput} output={output as RestaurantPickOutput | null} onSubmit={submit} />
+    case "propose_menu_selection":
+      return <MenuSelectorCard input={part.input as unknown as MenuSelectionInput} output={output as MenuSelectionOutput | null} onSubmit={submit} />
+    case "propose_pantry_restock":
+      return <PantryRestockCard input={part.input as unknown as PantryRestockInput} output={output as PantryRestockOutput | null} onSubmit={submit} />
     default:
       return <ToolTrace part={part} />
   }

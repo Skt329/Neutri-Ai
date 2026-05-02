@@ -33,7 +33,11 @@ import {
   Eye,
   EyeOff,
   Shield,
+  Link2,
+  Unlink,
+  AlertTriangle,
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import {
   changePassword,
@@ -56,6 +60,7 @@ export function SettingsPanel({ userEmail }: { userEmail: string }) {
     <div className="flex flex-col gap-6 animate-fade-in-up">
       <AccountSection userEmail={userEmail} />
       <AppearanceSection />
+      <SwiggyConnectionSection />
       <SignOutSection />
     </div>
   )
@@ -322,6 +327,142 @@ function AppearanceSection() {
             </button>
           )
         })}
+      </div>
+    </section>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SWIGGY CONNECTION SECTION
+   ════════════════════════════════════════════════════════════════ */
+
+function SwiggyConnectionSection() {
+  const [status, setStatus] = useState<{
+    connected: boolean
+    expiresAt: string | null
+    expiringSoon: boolean
+    scopes: string[]
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [actionPending, setActionPending] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/swiggy/status")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setStatus({ connected: false, expiresAt: null, expiringSoon: false, scopes: [] }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleConnect = useCallback(async () => {
+    setActionPending(true)
+    try {
+      const res = await fetch("/api/swiggy/connect", { method: "POST" })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || "Failed to start Swiggy connection")
+        setActionPending(false)
+      }
+    } catch {
+      toast.error("Failed to connect to Swiggy")
+      setActionPending(false)
+    }
+  }, [])
+
+  const handleDisconnect = useCallback(async () => {
+    setActionPending(true)
+    try {
+      const res = await fetch("/api/swiggy/disconnect", { method: "POST" })
+      const data = await res.json()
+      if (data.ok) {
+        setStatus({ connected: false, expiresAt: null, expiringSoon: false, scopes: [] })
+        toast.success("Swiggy disconnected")
+      } else {
+        toast.error(data.error || "Failed to disconnect")
+      }
+    } catch {
+      toast.error("Failed to disconnect Swiggy")
+    } finally {
+      setActionPending(false)
+    }
+  }, [])
+
+  const expiresLabel = status?.expiresAt
+    ? `Expires ${new Date(status.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+    : null
+
+  return (
+    <section className="bg-card rounded-2xl border border-border p-5 md:p-6">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-[#fc8019]/10">
+          <svg className="size-5" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#fc8019" />
+            <text x="6" y="16" fontSize="10" fill="white" fontWeight="bold">S</text>
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-ink">Swiggy</h3>
+            {!loading && (
+              <Badge
+                variant={status?.connected ? "default" : "outline"}
+                className={cn(
+                  "text-[10px] px-1.5 py-0",
+                  status?.connected
+                    ? "bg-sage/15 text-sage border-sage/30"
+                    : "text-stone border-border",
+                )}
+              >
+                {status?.connected ? "Connected" : "Not connected"}
+              </Badge>
+            )}
+          </div>
+          <p className="text-[11px] text-stone">
+            Order food & groceries with nutrition tracking
+          </p>
+        </div>
+      </div>
+
+      {status?.connected && status.expiringSoon && (
+        <div className="flex items-center gap-2 mb-4 rounded-lg bg-turmeric/10 border border-turmeric/20 px-3 py-2">
+          <AlertTriangle className="size-3.5 text-turmeric shrink-0" />
+          <p className="text-[11px] text-turmeric">
+            Connection expires soon. Reconnect to continue ordering.
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] text-stone">
+          {status?.connected && expiresLabel ? expiresLabel : "Connect your Swiggy account to order food and groceries from chat."}
+        </div>
+        {loading ? (
+          <Spinner className="size-4" />
+        ) : status?.connected ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDisconnect}
+            disabled={actionPending}
+            className="gap-2 text-xs border-clay/30 text-clay hover:bg-clay/5"
+          >
+            {actionPending ? <Spinner className="size-3.5" /> : <Unlink className="size-3.5" />}
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleConnect}
+            disabled={actionPending}
+            className="gap-2 text-xs border-sage/40 text-sage hover:bg-sage/5 hover:text-sage"
+          >
+            {actionPending ? <Spinner className="size-3.5" /> : <Link2 className="size-3.5" />}
+            Connect Swiggy
+          </Button>
+        )}
       </div>
     </section>
   )
