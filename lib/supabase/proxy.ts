@@ -32,6 +32,21 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
+  // For server action requests (POST with `next-action` header), do a full
+  // getUser() so the session tokens are refreshed BEFORE the action handler
+  // runs. This prevents the action's own getUser() from having to do both
+  // token refresh + validation — which doubles the timeout window.
+  const isServerAction = request.headers.get("next-action") !== null
+
+  if (isServerAction) {
+    try {
+      await supabase.auth.getUser()
+    } catch {
+      // Non-fatal — the action handler has its own retry logic.
+      // This is purely a best-effort session refresh.
+    }
+  }
+
   // Use getSession() instead of getUser() for route guard checks.
   // getSession() reads from the JWT cookie locally (no Supabase network call),
   // saving ~100-150ms per navigation. The authoritative getUser() verification

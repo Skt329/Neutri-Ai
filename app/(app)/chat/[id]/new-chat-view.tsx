@@ -40,7 +40,24 @@ export function NewChatView() {
       // prefill handler in ChatView will auto-send the message.
       router.push(`/chat/${newId}?prefill=${encodeURIComponent(text)}`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create conversation")
+      const msg = e instanceof Error ? e.message : "Failed to create conversation"
+
+      if (msg.includes("timed out") || msg.includes("timeout")) {
+        toast.error("Connection slow — retrying…", { duration: 2000 })
+        try {
+          const retryId = await createConversationOnly()
+          router.push(`/chat/${retryId}?prefill=${encodeURIComponent(text)}`)
+          return
+        } catch {
+          toast.error("Still failing. Please check your connection and try again.")
+        }
+      } else if (msg.includes("Not authenticated")) {
+        toast.error("Session expired — refreshing…", { duration: 2000 })
+        router.refresh() // triggers middleware session refresh
+      } else {
+        toast.error(msg)
+      }
+
       creatingRef.current = false
       setSending(false)
     }
