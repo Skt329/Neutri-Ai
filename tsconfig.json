@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
+    "types": ["@serwist/next/typings"],
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "esnext",
+      "webworker"
     ],
     "allowJs": true,
     "target": "ES6",
@@ -37,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase/functions",
+    "public/sw.js"
   ]
 }
