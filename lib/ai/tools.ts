@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeTargets } from "@/lib/nutrition"
 import { getSwiggyAdapter, SwiggyNotConfiguredError } from "@/lib/swiggy/adapter"
 import { PANTRY_CATEGORIES, MEAL_TYPES, normalizeCategory } from "@/lib/categories"
+import { lookupNutrition } from "@/lib/nutrition/nutrition-lookup"
 export { buildSwiggySmartTools } from "@/lib/ai/tools/swiggy-smart"
 
 /**
@@ -219,6 +220,111 @@ export function buildTools(supabase: SupabaseClient, userId: string) {
         })).min(1),
         total_estimated_price: z.number(),
       }),
+    }),
+
+    // ─── Nutrition lookup tools (server, external API) ─────────────────────
+
+    lookup_nutrition: tool({
+      description:
+        "Look up nutrition facts for a food item from trusted databases (USDA FoodData Central, Open Food Facts). " +
+        "Returns per-100g macros from authoritative sources. Use this BEFORE calling propose_meal_log or propose_pantry_items " +
+        "when you need accurate macro data for a specific food. Supports natural language queries and barcodes.",
+      inputSchema: z.object({
+        query: z.string().min(1).max(200).describe("Food name, e.g. 'chicken breast raw', 'brown rice cooked', 'greek yogurt'"),
+        barcode: z.string().nullable().default(null).describe("Optional product barcode (EAN/UPC) for exact match"),
+        quantity_g: z.number().nullable().default(null).describe("If provided, scale the per-100g values to this gram amount"),
+      }),
+      execute: async (input) => {
+        try {
+          const results = await lookupNutrition(input.query, {
+            barcode: input.barcode ?? undefined,
+          })
+
+          if (results.length === 0) {
+            return {
+              ok: true as const,
+              results: [],
+              instruction:
+                "No authoritative data found. Use your built-in reference values and mark as [estimated].",
+            }
+          }
+
+          const scaled = input.quantity_g
+            ? results.map((r) => ({
+                ...r,
+                calories_kcal: Math.round((r.calories_kcal * input.quantity_g!) / 100),
+                protein_g: Math.round((r.protein_g * input.quantity_g!) / 100 * 10) / 10,
+                carbs_g: Math.round((r.carbs_g * input.quantity_g!) / 100 * 10) / 10,
+                fat_g: Math.round((r.fat_g * input.quantity_g!) / 100 * 10) / 10,
+                fiber_g: Math.round((r.fiber_g * input.quantity_g!) / 100 * 10) / 10,
+                scaled_for_g: input.quantity_g,
+              }))
+            : results
+
+          return {
+            ok: true as const,
+            results: scaled.slice(0, 3),
+            source_note: `Data from ${results[0].source === "usda" ? "USDA FoodData Central" : "Open Food Facts"}`,
+          }
+        } catch (err) {
+          console.error("[lookup_nutrition]", err)
+          return {
+            ok: true as const,
+            results: [],
+            instruction:
+              "Nutrition lookup service unavailable. Use your built-in reference values and mark as [estimated].",
+          }
+        }
+      },
+    }),
+
+    lookup_nutrition_batch: tool({
+      description:
+        "Look up nutrition for MULTIPLE food items in one call. More efficient than calling lookup_nutrition " +
+        "multiple times. Use when logging a multi-item meal (e.g. 'I had rice, dal, and chicken').",
+      inputSchema: z.object({
+        items: z
+          .array(
+            z.object({
+              query: z.string().min(1).max(200),
+              quantity_g: z.number().nullable().default(null),
+            }),
+          )
+          .min(1)
+          .max(10),
+      }),
+      execute: async ({ items }) => {
+        try {
+          const results = await Promise.all(
+            items.map(async (item) => {
+              const hits = await lookupNutrition(item.query)
+              const best = hits[0] ?? null
+              if (!best) return { query: item.query, found: false as const }
+              const scale = item.quantity_g ? item.quantity_g / 100 : 1
+              return {
+                query: item.query,
+                found: true as const,
+                source: best.source,
+                name: best.name,
+                calories_kcal: Math.round(best.calories_kcal * scale),
+                protein_g: Math.round(best.protein_g * scale * 10) / 10,
+                carbs_g: Math.round(best.carbs_g * scale * 10) / 10,
+                fat_g: Math.round(best.fat_g * scale * 10) / 10,
+                fiber_g: Math.round(best.fiber_g * scale * 10) / 10,
+                per_100g: !item.quantity_g,
+              }
+            }),
+          )
+          return { ok: true as const, items: results }
+        } catch (err) {
+          console.error("[lookup_nutrition_batch]", err)
+          return {
+            ok: true as const,
+            items: items.map((i) => ({ query: i.query, found: false as const })),
+            instruction: "Batch lookup failed. Use built-in reference values and mark as [estimated].",
+          }
+        }
+      },
     }),
 
     // ─── Server tools (authoritative writes / reads) ──────────────────────
