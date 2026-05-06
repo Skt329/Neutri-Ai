@@ -443,3 +443,49 @@ html {
   border-radius: 4px;
   font-size: 0.85em;
 }
+
+/* ════════════════════════════════════════════
+   html5-qrcode library overrides
+   Force the camera viewfinder to fill our container
+════════════════════════════════════════════ */
+.barcode-scanner-region {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: none !important;
+}
+.barcode-scanner-region > div {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+}
+.barcode-scanner-region video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  position: absolute !important;
+  inset: 0 !important;
+  border: none !important;
+}
+/* Hide library's built-in scan region + shaded areas — we draw our own overlay */
+.barcode-scanner-region canvas,
+.barcode-scanner-region img[alt="Info icon"],
+#qr-shaded-region {
+  display: none !important;
+}
+/* Make the qrbox transparent (library draws a coloured border box) */
+#barcode-scanner-region__scan_region {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  min-height: 0 !important;
+}
+#barcode-scanner-region__scan_region > img {
+  display: none !important;
+}
+#barcode-scanner-region__header_message {
+  display: none !important;
+}
+#barcode-scanner-region__dashboard_section {
+  display: none !important;
+}

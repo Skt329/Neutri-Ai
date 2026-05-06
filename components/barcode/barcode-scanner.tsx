@@ -154,17 +154,17 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Camera viewfinder */}
+      {/* Camera viewfinder — fill available width, tall on mobile */}
       <div
         className={cn(
           "relative w-full rounded-2xl overflow-hidden border-2 bg-ink/95",
           cameraActive ? "border-sage/40" : "border-border",
         )}
-        style={{ aspectRatio: "4/3" }}
+        style={{ minHeight: "min(70vh, 480px)" }}
       >
         <div
           ref={scannerRef}
-          className="absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"
+          className="absolute inset-0 barcode-scanner-region"
         />
 
         {/* Scanning overlay */}
