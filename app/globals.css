@@ -308,6 +308,12 @@
   50% { opacity: 0.5; transform: scale(1.4); }
 }
 
+@keyframes scan-line {
+  0% { top: 0; }
+  50% { top: calc(100% - 2px); }
+  100% { top: 0; }
+}
+
 @layer utilities {
   .animate-fade-in-up {
     animation: fade-in-up 0.5s ease-out both;
@@ -350,6 +356,9 @@
   }
   .animate-pulse-dot {
     animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+  .animate-scan-line {
+    animation: scan-line 2s ease-in-out infinite;
   }
   .hero-gradient-text {
     background: linear-gradient(135deg, var(--sage) 0%, var(--turmeric) 100%);

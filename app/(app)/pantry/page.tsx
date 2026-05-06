@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { PantryList } from "./pantry-list"
 import { PantrySummary } from "./pantry-summary"
 import { getCachedPantryItems } from "@/lib/supabase/queries"
-import { MessageCircle, Sparkles } from "lucide-react"
+import { MessageCircle, Sparkles, ScanBarcode } from "lucide-react"
 
 export const metadata = {
   title: "Pantry — NutriAI",
@@ -27,11 +27,18 @@ export default async function PantryPage() {
             Everything in your kitchen — NutriAI uses this to plan your meals.
           </p>
         </div>
-        <Button asChild className="gap-2 bg-forest hover:bg-sage text-white rounded-full px-5 w-fit">
-          <Link href="/chat">
-            <MessageCircle className="size-4" /> Add via chat
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="gap-2 rounded-full px-4 w-fit border-sage/30 text-sage hover:bg-mint/10">
+            <Link href="/barcode">
+              <ScanBarcode className="size-4" /> Scan to Add
+            </Link>
+          </Button>
+          <Button asChild className="gap-2 bg-forest hover:bg-sage text-white rounded-full px-5 w-fit">
+            <Link href="/chat">
+              <MessageCircle className="size-4" /> Add via chat
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

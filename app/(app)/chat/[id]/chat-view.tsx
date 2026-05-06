@@ -35,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown, Copy, FileDown, Share2, Link2 } from "lucide-react"
+import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image as ImageIcon, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown, Copy, FileDown, Share2, Link2, Camera, X } from "lucide-react"
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
 import { shareChat, revokeShare } from "../../profile/settings-actions"
@@ -132,10 +132,50 @@ export function ChatView({
   const [renameValue, setRenameValue] = useState(title ?? "")
   const [actionPending, setActionPending] = useState(false)
   const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [pendingImages, setPendingImages] = useState<Array<{ url: string; name: string; type: string }>>([])
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const isAutoScrollingRef = useRef(false)
   const scrollRafRef = useRef<number | null>(null)
+
+  const MAX_IMAGE_SIZE = 4 * 1024 * 1024 // 4MB
+  const MAX_IMAGES = 3
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+    const newImages: Array<{ url: string; name: string; type: string }> = []
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} is not an image`)
+        continue
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast.error(`${file.name} exceeds 4MB limit`)
+        continue
+      }
+      if (pendingImages.length + newImages.length >= MAX_IMAGES) {
+        toast.error(`Maximum ${MAX_IMAGES} images per message`)
+        break
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        setPendingImages((prev) => {
+          if (prev.length >= MAX_IMAGES) return prev
+          return [...prev, { url: reader.result as string, name: file.name, type: file.type }]
+        })
+      }
+      reader.readAsDataURL(file)
+      newImages.push({ url: "", name: file.name, type: file.type })
+    }
+    // Reset input so the same file can be selected again
+    e.target.value = ""
+  }
+
+  function removeImage(index: number) {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index))
+  }
 
   // Detect touch device — on mobile, Enter inserts newline (send via button).
   // On desktop, Enter sends (Shift+Enter for newline).
@@ -207,12 +247,26 @@ export function ChatView({
   const isEmpty = messages.length === 0
 
   const sendText = useCallback((text: string) => {
-    if (!text.trim() || status === "streaming" || status === "submitted") return
+    if (status === "streaming" || status === "submitted") return
+    const hasImages = pendingImages.length > 0
+    if (!text.trim() && !hasImages) return
     setLastFailedInput(text)
     setInput("")
     if (textareaRef.current) textareaRef.current.style.height = "auto"
-    sendMessage({ text })
-  }, [status, sendMessage])
+
+    if (hasImages) {
+      // Send as multimodal message with file parts
+      const parts: Array<{ type: "text"; text: string } | { type: "file"; mediaType: string; url: string }> = []
+      if (text.trim()) parts.push({ type: "text", text })
+      for (const img of pendingImages) {
+        parts.push({ type: "file", mediaType: img.type, url: img.url })
+      }
+      setPendingImages([])
+      sendMessage({ parts })
+    } else {
+      sendMessage({ text })
+    }
+  }, [status, sendMessage, pendingImages])
 
   function handleTextareaChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value)
@@ -412,45 +466,90 @@ export function ChatView({
         onSubmit={onSubmit}
         className="border-t border-border bg-card px-4 py-3 md:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
       >
-        <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleTextareaChange}
-            onKeyDown={(e) => {
-              // Desktop: Enter sends, Shift+Enter newline
-              // Mobile: Enter always inserts newline (send via button)
-              if (e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
-                e.preventDefault()
-                if (!isStreaming) onSubmit(e)
-              }
-            }}
-            placeholder="Ask NutriAI anything…"
-            rows={1}
-            className="min-h-[48px] max-h-[160px] flex-1 resize-none rounded-2xl border-cream3 bg-cream2 placeholder:text-fog focus:border-sage focus:ring-sage/20"
-            aria-label="Type a message to NutriAI"
-          />
-          {isStreaming ? (
+        <div className="mx-auto w-full max-w-3xl">
+          {/* Image preview strip */}
+          {pendingImages.length > 0 && (
+            <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+              {pendingImages.map((img, i) => (
+                <div key={i} className="relative shrink-0 group">
+                  <img
+                    src={img.url}
+                    alt={img.name}
+                    className="size-16 rounded-xl object-cover border border-border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-clay text-white text-[10px] opacity-0 group-hover:opacity-100 hover:bg-clay/80 smooth-hover shadow-sm"
+                    aria-label={`Remove ${img.name}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            {/* Camera / image attachment button */}
             <Button
               type="button"
+              variant="ghost"
               size="icon"
-              onClick={() => stop()}
-              aria-label="Stop generating"
-              className="bg-clay hover:bg-clay/80 text-white rounded-full size-12 shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || pendingImages.length >= MAX_IMAGES}
+              aria-label="Attach image or take photo"
+              className="text-stone hover:text-forest rounded-full size-10 shrink-0"
             >
-              <Square className="size-4" />
+              <Camera className="size-5" />
             </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!input.trim()}
-              aria-label="Send message"
-              className="bg-forest hover:bg-sage text-white rounded-full size-12 shrink-0"
-            >
-              <Send className="size-4" />
-            </Button>
-          )}
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleTextareaChange}
+              onKeyDown={(e) => {
+                // Desktop: Enter sends, Shift+Enter newline
+                // Mobile: Enter always inserts newline (send via button)
+                if (e.key === "Enter" && !e.shiftKey && !isTouchDevice) {
+                  e.preventDefault()
+                  if (!isStreaming) onSubmit(e)
+                }
+              }}
+              placeholder={pendingImages.length > 0 ? "Add a message about the image…" : "Ask NutriAI anything…"}
+              rows={1}
+              className="min-h-[48px] max-h-[160px] flex-1 resize-none rounded-2xl border-cream3 bg-cream2 placeholder:text-fog focus:border-sage focus:ring-sage/20"
+              aria-label="Type a message to NutriAI"
+            />
+            {isStreaming ? (
+              <Button
+                type="button"
+                size="icon"
+                onClick={() => stop()}
+                aria-label="Stop generating"
+                className="bg-clay hover:bg-clay/80 text-white rounded-full size-12 shrink-0"
+              >
+                <Square className="size-4" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!input.trim() && pendingImages.length === 0}
+                aria-label="Send message"
+                className="bg-forest hover:bg-sage text-white rounded-full size-12 shrink-0"
+              >
+                <Send className="size-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </form>
 

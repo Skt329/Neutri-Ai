@@ -1,6 +1,6 @@
 'use client'
 
-
+import Link from 'next/link'
 
 const ACTIONS = [
   { emoji: '🍽️', label: 'Log a meal', prompt: 'I want to log a meal' },
@@ -25,6 +25,14 @@ export function QuickActions({ onPick }: { onPick: (prompt: string) => void }) {
           {a.label}
         </button>
       ))}
+      <Link
+        href="/barcode"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-stone hover:border-sage/30 hover:bg-cream2 hover:text-ink smooth-hover"
+      >
+        <span>📷</span>
+        Scan barcode
+      </Link>
     </div>
   )
 }
+
