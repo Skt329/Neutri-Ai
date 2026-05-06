@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createConversationOnly } from "../actions"
 import { toast } from "sonner"
-import { Leaf, Send } from "lucide-react"
+import { Leaf, Send, Camera, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -24,21 +24,54 @@ export function NewChatView() {
   const router = useRouter()
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
+  const [pendingImages, setPendingImages] = useState<Array<{ url: string; name: string; type: string }>>([])
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const creatingRef = useRef(false) // guard against double-tap
+
+  const MAX_IMAGE_SIZE = 4 * 1024 * 1024
+  const MAX_IMAGES = 3
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) { toast.error(`${file.name} is not an image`); continue }
+      if (file.size > MAX_IMAGE_SIZE) { toast.error(`${file.name} exceeds 4MB limit`); continue }
+      if (pendingImages.length >= MAX_IMAGES) { toast.error(`Maximum ${MAX_IMAGES} images per message`); break }
+      const reader = new FileReader()
+      reader.onload = () => {
+        setPendingImages((prev) => prev.length >= MAX_IMAGES ? prev : [...prev, { url: reader.result as string, name: file.name, type: file.type }])
+      }
+      reader.readAsDataURL(file)
+    }
+    e.target.value = ""
+  }
+
+  function removeImage(index: number) {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || sending || creatingRef.current) return
+    const hasImages = pendingImages.length > 0
+    if ((!text && !hasImages) || sending || creatingRef.current) return
 
     creatingRef.current = true
     setSending(true)
 
     try {
       const newId = await createConversationOnly()
+      // If images are attached, store them in sessionStorage for ChatView to pick up
+      if (hasImages) {
+        try {
+          sessionStorage.setItem(`prefill-images-${newId}`, JSON.stringify(pendingImages))
+        } catch { /* sessionStorage full — images will just be lost */ }
+        setPendingImages([])
+      }
       // Navigate to the real chat page with prefill — the existing
       // prefill handler in ChatView will auto-send the message.
-      router.push(`/chat/${newId}?prefill=${encodeURIComponent(text)}`)
+      router.push(`/chat/${newId}?prefill=${encodeURIComponent(text || "Add these items to my pantry")}`)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to create conversation"
 
@@ -61,7 +94,7 @@ export function NewChatView() {
       creatingRef.current = false
       setSending(false)
     }
-  }, [input, sending, router])
+  }, [input, sending, router, pendingImages])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Desktop: Enter sends, Shift+Enter newline
@@ -100,43 +133,83 @@ export function NewChatView() {
 
       {/* ── Input bar (flush to bottom) ── */}
       <div className="sticky bottom-0 bg-cream border-t border-border px-3 py-2 safe-area-pb">
-        <div className="flex items-end gap-2 max-w-3xl mx-auto">
-          <div className="relative flex-1">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Tell NutriAI what you ate..."
-              disabled={sending}
-              rows={1}
-              className={cn(
-                "w-full resize-none rounded-2xl border border-border bg-card px-4 py-3 pr-12",
-                "text-sm text-ink placeholder:text-fog",
-                "focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                "transition-all duration-150",
-              )}
-              style={{ maxHeight: 160 }}
+        <div className="max-w-3xl mx-auto">
+          {/* Image preview strip */}
+          {pendingImages.length > 0 && (
+            <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+              {pendingImages.map((img, i) => (
+                <div key={i} className="relative shrink-0 group">
+                  <img src={img.url} alt={img.name} className="size-16 rounded-xl object-cover border border-border" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-clay text-white text-[10px] opacity-0 group-hover:opacity-100 hover:bg-clay/80 smooth-hover shadow-sm"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
             />
+            {/* Camera / image attachment button */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || pendingImages.length >= MAX_IMAGES}
+              aria-label="Attach image or take photo"
+              className="text-stone hover:text-forest rounded-full size-10 shrink-0"
+            >
+              <Camera className="size-5" />
+            </Button>
+            <div className="relative flex-1">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
+                placeholder={pendingImages.length > 0 ? "Add a message about the image…" : "Tell NutriAI what you ate..."}
+                disabled={sending}
+                rows={1}
+                className={cn(
+                  "w-full resize-none rounded-2xl border border-border bg-card px-4 py-3",
+                  "text-sm text-ink placeholder:text-fog",
+                  "focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "transition-all duration-150",
+                )}
+                style={{ maxHeight: 160 }}
+              />
+            </div>
+            <Button
+              onClick={handleSend}
+              disabled={(!input.trim() && pendingImages.length === 0) || sending}
+              size="icon"
+              className={cn(
+                "size-11 rounded-xl shrink-0 transition-all duration-200",
+                (input.trim() || pendingImages.length > 0)
+                  ? "bg-forest hover:bg-forest/90 text-cream shadow-md"
+                  : "bg-muted text-fog",
+              )}
+            >
+              {sending ? (
+                <div className="size-4 border-2 border-cream/30 border-t-cream rounded-full animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-            size="icon"
-            className={cn(
-              "size-11 rounded-xl shrink-0 transition-all duration-200",
-              input.trim()
-                ? "bg-forest hover:bg-forest/90 text-cream shadow-md"
-                : "bg-muted text-fog",
-            )}
-          >
-            {sending ? (
-              <div className="size-4 border-2 border-cream/30 border-t-cream rounded-full animate-spin" />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </Button>
         </div>
       </div>
     </div>

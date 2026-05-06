@@ -224,7 +224,30 @@ export function ChatView({
     const prefill = searchParams.get("prefill")
     if (!prefill || initialMessages.length > 0) return
     prefillHandled.current = true
-    sendMessage({ text: prefill })
+
+    // Check if NewChatView stored images in sessionStorage
+    const storageKey = `prefill-images-${conversationId}`
+    let storedImages: Array<{ url: string; name: string; type: string }> = []
+    try {
+      const raw = sessionStorage.getItem(storageKey)
+      if (raw) {
+        storedImages = JSON.parse(raw)
+        sessionStorage.removeItem(storageKey)
+      }
+    } catch { /* ignore */ }
+
+    if (storedImages.length > 0) {
+      // Send multimodal message with images
+      const parts: Array<{ type: "text"; text: string } | { type: "file"; mediaType: string; url: string }> = []
+      parts.push({ type: "text", text: prefill })
+      for (const img of storedImages) {
+        parts.push({ type: "file", mediaType: img.type, url: img.url })
+      }
+      sendMessage({ parts })
+    } else {
+      sendMessage({ text: prefill })
+    }
+
     const url = new URL(window.location.href)
     url.searchParams.delete("prefill")
     window.history.replaceState(null, "", url.toString())
@@ -697,6 +720,23 @@ function MessageBubble({
                 <CopyButton text={part.text} isUser={isUser} />
               </div>
             )
+          }
+
+          // File/image parts — show as inline thumbnails in the message
+          if (part.type === "file" || (part as any).type === "image") {
+            const fileUrl = (part as any).url || (part as any).data
+            const mimeType = (part as any).mediaType || (part as any).mimeType || "image/jpeg"
+            if (fileUrl && mimeType.startsWith("image/")) {
+              return (
+                <img
+                  key={i}
+                  src={fileUrl}
+                  alt="Attached image"
+                  className="max-w-[240px] max-h-[200px] rounded-xl border border-border/50 object-cover shadow-sm"
+                />
+              )
+            }
+            return null
           }
 
           // Skip non-visible parts

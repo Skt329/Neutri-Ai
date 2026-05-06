@@ -26,14 +26,10 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
   const handleScanSuccess = useCallback(
     (decodedText: string) => {
       const now = Date.now()
-      // Debounce: ignore duplicate scans within 2 seconds
       if (decodedText === lastScan && now - debounceRef.current < 2000) return
       debounceRef.current = now
       setLastScan(decodedText)
-
-      // Vibrate on successful scan
       if (navigator.vibrate) navigator.vibrate(200)
-
       onScan(decodedText)
     },
     [lastScan, onScan],
@@ -48,11 +44,9 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
     async function startScanner() {
       try {
         const { Html5Qrcode } = await import("html5-qrcode")
-
         if (!mounted || !scannerRef.current) return
 
         const scannerId = "barcode-scanner-region"
-        // Ensure container has the ID
         if (scannerRef.current) scannerRef.current.id = scannerId
 
         scanner = new Html5Qrcode(scannerId)
@@ -62,16 +56,14 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
           { facingMode: "environment" },
           {
             fps: 15,
-            qrbox: { width: 280, height: 140 },
-            aspectRatio: 2,
+            qrbox: { width: 280, height: 150 },
+            aspectRatio: 1.5,
             disableFlip: false,
           },
           (decodedText: string) => {
             if (mounted) handleScanSuccess(decodedText)
           },
-          () => {
-            // Scan failure — ignore (happens every frame when no barcode visible)
-          },
+          () => {},
         )
 
         if (mounted) {
@@ -82,7 +74,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
         if (!mounted) return
         const msg = err instanceof Error ? err.message : String(err)
         if (msg.includes("NotAllowed") || msg.includes("Permission")) {
-          setCameraError("Camera permission denied. Please allow camera access and try again.")
+          setCameraError("Camera permission denied. Please allow camera access in your browser settings and reload.")
         } else if (msg.includes("NotFound") || msg.includes("no cameras")) {
           setCameraError("No camera found on this device.")
         } else {
@@ -97,10 +89,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
     return () => {
       mounted = false
       if (scanner) {
-        scanner
-          .stop()
-          .then(() => scanner.clear())
-          .catch(() => {})
+        scanner.stop().then(() => scanner.clear()).catch(() => {})
       }
       html5QrRef.current = null
     }
@@ -124,22 +113,20 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
         await track.torchFeature.apply(!torch)
         setTorch(!torch)
       }
-    } catch {
-      // Torch not supported on this device
-    }
+    } catch {}
   }
 
   if (showManual) {
     return (
-      <div className="flex flex-col items-center gap-4 p-6 rounded-2xl border border-border bg-card animate-fade-in">
-        <div className="flex size-14 items-center justify-center rounded-full bg-mint2 text-sage">
+      <div className="flex flex-col items-center gap-5 p-6 rounded-2xl border border-border bg-card animate-fade-in">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-mint2 text-sage">
           <Keyboard className="size-6" />
         </div>
         <div className="text-center">
-          <h3 className="font-semibold text-ink">Enter barcode manually</h3>
-          <p className="text-sm text-stone mt-1">Type the number below the barcode lines</p>
+          <h3 className="font-semibold text-ink text-lg">Enter barcode manually</h3>
+          <p className="text-sm text-stone mt-1">Type the number printed below the barcode lines</p>
         </div>
-        <form onSubmit={handleManualSubmit} className="flex w-full max-w-xs gap-2">
+        <form onSubmit={handleManualSubmit} className="flex w-full gap-2">
           <Input
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ""))}
@@ -148,95 +135,109 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
             inputMode="numeric"
             pattern="[0-9]*"
             autoFocus
-            className="text-center tabular-nums"
+            className="text-center tabular-nums text-base h-12"
           />
           <Button
             type="submit"
             disabled={manualCode.trim().length < 8}
-            className="bg-forest hover:bg-sage text-white shrink-0"
+            className="bg-forest hover:bg-sage text-white shrink-0 h-12 px-5"
           >
             Look up
           </Button>
         </form>
-        <Button variant="ghost" size="sm" onClick={() => setShowManual(false)} className="text-stone">
-          <ScanBarcode className="mr-1.5 size-4" /> Use camera instead
+        <Button variant="ghost" size="sm" onClick={() => setShowManual(false)} className="text-stone gap-1.5">
+          <ScanBarcode className="size-4" /> Use camera instead
         </Button>
       </div>
     )
   }
 
   return (
-    <div className="relative flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       {/* Camera viewfinder */}
       <div
         className={cn(
-          "relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border-2 bg-ink/95",
-          cameraActive ? "border-sage/50" : "border-border",
+          "relative w-full rounded-2xl overflow-hidden border-2 bg-ink/95",
+          cameraActive ? "border-sage/40" : "border-border",
         )}
+        style={{ aspectRatio: "4/3" }}
       >
-        <div ref={scannerRef} className="absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full" />
+        <div
+          ref={scannerRef}
+          className="absolute inset-0 [&>video]:object-cover [&>video]:w-full [&>video]:h-full"
+        />
 
         {/* Scanning overlay */}
         {cameraActive && (
           <div className="absolute inset-0 pointer-events-none">
-            {/* Scan line animation */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[140px]">
-              <div className="absolute inset-0 border-2 border-sage/60 rounded-lg" />
+            {/* Scan target area */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] max-w-[300px] h-[45%] max-h-[160px]">
+              <div className="absolute inset-0 border-2 border-sage/50 rounded-xl" />
               <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-sage to-transparent animate-scan-line" />
               {/* Corner markers */}
-              <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-sage rounded-tl" />
-              <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-sage rounded-tr" />
-              <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-sage rounded-bl" />
-              <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-sage rounded-br" />
+              <div className="absolute -top-px -left-px w-6 h-6 border-t-[3px] border-l-[3px] border-sage rounded-tl-lg" />
+              <div className="absolute -top-px -right-px w-6 h-6 border-t-[3px] border-r-[3px] border-sage rounded-tr-lg" />
+              <div className="absolute -bottom-px -left-px w-6 h-6 border-b-[3px] border-l-[3px] border-sage rounded-bl-lg" />
+              <div className="absolute -bottom-px -right-px w-6 h-6 border-b-[3px] border-r-[3px] border-sage rounded-br-lg" />
             </div>
-            <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-white/70 font-medium">
-              Point at a product barcode
-            </p>
+            {/* Hint text */}
+            <div className="absolute bottom-5 left-0 right-0 text-center">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink/60 backdrop-blur-sm text-xs text-white/90 font-medium">
+                <ScanBarcode className="size-3.5" /> Point at a product barcode
+              </span>
+            </div>
           </div>
         )}
 
         {/* Loading state */}
         {!cameraActive && !cameraError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div className="size-8 rounded-full border-2 border-sage/30 border-t-sage animate-spin" />
-            <p className="text-sm text-white/60">Starting camera…</p>
+            <div className="size-10 rounded-full border-2 border-sage/30 border-t-sage animate-spin" />
+            <p className="text-sm text-white/60 font-medium">Starting camera…</p>
           </div>
         )}
 
         {/* Error state */}
         {cameraError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-            <div className="flex size-12 items-center justify-center rounded-full bg-clay/20 text-clay">
-              <X className="size-5" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-clay/20 text-clay">
+              <X className="size-6" />
             </div>
-            <p className="text-sm text-white/80">{cameraError}</p>
-            <Button variant="outline" size="sm" onClick={() => setShowManual(true)} className="text-white border-white/20 hover:bg-white/10">
-              Enter code manually
+            <p className="text-sm text-white/80 max-w-[260px] leading-relaxed">{cameraError}</p>
+            <Button
+              onClick={() => setShowManual(true)}
+              className="bg-white/10 hover:bg-white/20 text-white border-0 rounded-full"
+            >
+              <Keyboard className="mr-1.5 size-4" /> Enter code manually
             </Button>
           </div>
         )}
 
-        {/* Controls overlay */}
+        {/* Torch toggle */}
         {cameraActive && (
-          <div className="absolute top-3 right-3 flex gap-2">
+          <div className="absolute top-3 right-3">
             <button
               onClick={toggleTorch}
-              className="flex size-9 items-center justify-center rounded-full bg-ink/60 text-white/80 backdrop-blur-sm hover:bg-ink/80 smooth-hover"
+              className="flex size-10 items-center justify-center rounded-full bg-ink/50 text-white/80 backdrop-blur-sm hover:bg-ink/70 smooth-hover"
               aria-label={torch ? "Turn off flashlight" : "Turn on flashlight"}
             >
-              {torch ? <FlashlightOff className="size-4" /> : <Flashlight className="size-4" />}
+              {torch ? <FlashlightOff className="size-4.5" /> : <Flashlight className="size-4.5" />}
             </button>
           </div>
         )}
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => setShowManual(true)} className="text-stone">
-          <Keyboard className="mr-1.5 size-3.5" /> Type code
+      <div className="flex items-center justify-center gap-3 w-full">
+        <Button
+          variant="outline"
+          onClick={() => setShowManual(true)}
+          className="rounded-full gap-1.5 border-border text-stone hover:text-ink"
+        >
+          <Keyboard className="size-4" /> Type barcode
         </Button>
         {onClose && (
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-stone">
+          <Button variant="ghost" onClick={onClose} className="rounded-full text-stone">
             Cancel
           </Button>
         )}
