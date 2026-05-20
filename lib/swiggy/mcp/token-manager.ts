@@ -121,7 +121,14 @@ export async function storeToken(
   userId: string,
   tokenData: SwiggyTokenResponse,
 ): Promise<void> {
-  const encrypted = encrypt(tokenData.access_token)
+  let encrypted: string
+  try {
+    encrypted = encrypt(tokenData.access_token)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(`Failed to encrypt Swiggy access token: ${msg}`)
+  }
+
   const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
   const scopes = tokenData.scope?.split(" ") ?? ["food", "instamart"]
 
@@ -158,7 +165,12 @@ export async function getValidToken(
   const expiresAt = new Date(data.expires_at)
   if (expiresAt <= new Date()) return null // expired
 
-  return decrypt(data.access_token_enc)
+  try {
+    return decrypt(data.access_token_enc)
+  } catch (err) {
+    console.error("[Swiggy Token Manager] Failed to decrypt Swiggy access token:", err)
+    return null
+  }
 }
 
 /**

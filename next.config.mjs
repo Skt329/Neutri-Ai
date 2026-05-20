@@ -10,7 +10,10 @@ const withSerwist = withSerwistInit({
 const nextConfig = {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
+      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: 'images.openfoodfacts.org' },
+      { protocol: 'https', hostname: 'world.openfoodfacts.org' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
   // Serwist uses a webpack plugin for SW generation.

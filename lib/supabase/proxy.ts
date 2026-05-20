@@ -1,18 +1,53 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-const PROTECTED_PREFIXES = ["/dashboard", "/chat", "/onboarding", "/meals", "/pantry", "/profile", "/swiggy"]
+const PROTECTED_PREFIXES = ["/dashboard", "/chat", "/onboarding", "/meals", "/pantry", "/profile", "/swiggy", "/barcode"]
 const AUTH_ONLY_PATHS = ["/auth/login", "/auth/sign-up"]
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+// Origins allowed to make cross-origin requests to the API.
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+].filter(Boolean)
 
+// ── Security helpers ─────────────────────────────────────────────────────────
+
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("X-Content-Type-Options", "nosniff")
+  response.headers.set("X-Frame-Options", "DENY")
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  response.headers.set("X-XSS-Protection", "1; mode=block")
+  response.headers.set("Permissions-Policy", "camera=(self), microphone=()")
+  return response
+}
+
+function applyCORS(request: NextRequest, response: NextResponse): NextResponse {
+  const origin = request.headers.get("origin")
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin)
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    response.headers.set("Access-Control-Allow-Credentials", "true")
+  }
+  return response
+}
+
+// ── Main middleware ──────────────────────────────────────────────────────────
+
+export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Handle CORS preflight (OPTIONS)
+  if (request.method === "OPTIONS") {
+    const preflight = new NextResponse(null, { status: 204 })
+    return applyCORS(request, addSecurityHeaders(preflight))
+  }
+
+  let supabaseResponse = NextResponse.next({ request })
 
   // API routes handle their own auth — skip getUser() here to avoid
   // double Supabase round-trips and edge-runtime timeout issues.
   if (pathname.startsWith("/api/")) {
-    return supabaseResponse
+    return applyCORS(request, addSecurityHeaders(supabaseResponse))
   }
 
   const supabase = createServerClient(
@@ -69,15 +104,15 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     url.searchParams.set("next", pathname)
-    return NextResponse.redirect(url)
+    return addSecurityHeaders(NextResponse.redirect(url))
   }
 
   if (isAuthOnly && user) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     url.search = ""
-    return NextResponse.redirect(url)
+    return addSecurityHeaders(NextResponse.redirect(url))
   }
 
-  return supabaseResponse
+  return addSecurityHeaders(supabaseResponse)
 }

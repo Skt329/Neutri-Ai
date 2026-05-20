@@ -1,21 +1,22 @@
 /**
- * Swiggy MCP client factory with in-memory session caching.
+ * Swiggy MCP client factory with Redis-backed tool definition caching.
  *
  * Creates MCP clients for Swiggy Food and Instamart servers using the
  * Vercel AI SDK's @ai-sdk/mcp package. Each client connects via
  * Streamable HTTP (JSON-RPC) with the user's Bearer token.
  *
- * CACHING: MCP clients and discovered tools are cached per-token for
- * 5 minutes to avoid redundant HTTP handshakes and tool discovery on
- * every chat request. Cache is invalidated on token change or TTL expiry.
+ * CACHING: Discovered tool definitions are cached in Upstash Redis per-token
+ * for 5 minutes. On cache hits, client instances are recreated and bound to the
+ * cached definitions synchronously, avoiding high-latency discovery network calls.
  *
- * IMPORTANT: Clients must stay alive while tools are being used.
- * Call the returned `cleanup()` after the stream finishes.
+ * CLEANUP: To prevent socket leaks in serverless runtimes, all active client
+ * connections are closed at the end of the request via the returned `cleanup()` callback.
  */
 
-import { createMCPClient } from "@ai-sdk/mcp"
+import { createMCPClient, type ListToolsResult } from "@ai-sdk/mcp"
 import { createHash } from "crypto"
 import type { ToolSet } from "ai"
+import { redisGet, redisSet } from "@/lib/redis"
 
 // ── Server endpoints ─────────────────────────────────────────────────────────
 
@@ -26,40 +27,20 @@ export const SWIGGY_MCP_SERVERS = {
 
 export type SwiggyVertical = keyof typeof SWIGGY_MCP_SERVERS
 
-// ── In-memory MCP session cache ──────────────────────────────────────────────
-
-interface CachedMCPSession {
-  tools: ToolSet
+interface CachedDefinitions {
   connectedVerticals: SwiggyVertical[]
-  clients: Array<{ close: () => Promise<void> }>
-  createdAt: number
-  tokenHash: string
+  definitions: Record<SwiggyVertical, ListToolsResult>
 }
 
-const mcpCache = new Map<string, CachedMCPSession>()
-const MCP_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
-
-/** Hash token to avoid storing raw secrets as map keys. */
+/** Hash token to avoid storing raw secrets in Redis keys. */
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex").slice(0, 16)
-}
-
-/** Evict stale cache entries (called on every access). */
-function evictStaleEntries(): void {
-  const now = Date.now()
-  for (const [key, session] of mcpCache) {
-    if (now - session.createdAt > MCP_CACHE_TTL_MS) {
-      // Fire-and-forget cleanup of expired clients
-      Promise.allSettled(session.clients.map((c) => c.close())).catch(() => {})
-      mcpCache.delete(key)
-    }
-  }
 }
 
 // ── Cached Client Creation ───────────────────────────────────────────────────
 
 /**
- * Get Swiggy MCP tools, using cache when available.
+ * Get Swiggy MCP tools, using Redis cache when available.
  *
  * Returns cached tools if the token matches and TTL hasn't expired.
  * Otherwise creates fresh MCP clients, discovers tools, and caches them.
@@ -70,111 +51,140 @@ export async function getSwiggyMCPTools(accessToken: string): Promise<{
   errors: Array<{ vertical: SwiggyVertical; error: string }>
   cleanup: () => Promise<void>
 }> {
-  evictStaleEntries()
-
   const tokenHash = hashToken(accessToken)
+  const cacheKey = `swiggy_mcp_tools:${tokenHash}`
 
-  // Check cache
-  const cached = mcpCache.get(tokenHash)
-  if (cached && Date.now() - cached.createdAt < MCP_CACHE_TTL_MS) {
-    console.log(`[swiggy-mcp] Using cached tools (${Object.keys(cached.tools).length} tools, age: ${Math.round((Date.now() - cached.createdAt) / 1000)}s)`)
-    return {
-      tools: cached.tools,
-      connectedVerticals: cached.connectedVerticals,
-      errors: [],
-      // Cleanup is a no-op for cached sessions — clients stay alive until TTL expires
-      cleanup: async () => {},
+  // Try to load cached definitions from Redis
+  let cachedData: CachedDefinitions | null = null
+  try {
+    const cachedRaw = await redisGet(cacheKey)
+    if (cachedRaw) {
+      cachedData = JSON.parse(cachedRaw) as CachedDefinitions
     }
+  } catch (err) {
+    console.warn("[swiggy-mcp] Failed to read tool definitions cache from Redis:", err)
   }
 
-  // Cache miss — create fresh clients
-  console.log("[swiggy-mcp] Cache miss — discovering tools...")
   const verticals = Object.keys(SWIGGY_MCP_SERVERS) as SwiggyVertical[]
   const activeClients: Array<{ close: () => Promise<void> }> = []
-
-  const results = await Promise.allSettled(
-    verticals.map(async (vertical) => {
-      const client = await createMCPClient({
-        transport: {
-          type: "http",
-          url: SWIGGY_MCP_SERVERS[vertical],
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      })
-      // Keep client alive — tools need it to dispatch calls
-      activeClients.push(client)
-      const tools = await client.tools()
-      console.log(
-        `[swiggy-mcp] ${vertical}: discovered ${Object.keys(tools).length} tools`,
-      )
-      return { vertical, tools }
-    }),
-  )
-
-  const mergedTools: Record<string, ToolSet[string]> = {}
+  const mergedTools: Record<string, any> = {}
   const connectedVerticals: SwiggyVertical[] = []
   const errors: Array<{ vertical: SwiggyVertical; error: string }> = []
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i]
-    const vertical = verticals[i]
+  if (cachedData) {
+    console.log(`[swiggy-mcp] Cache hit for tool definitions. Reconstructing clients...`)
 
-    if (result.status === "fulfilled") {
-      const { tools } = result.value
-      // Prefix tool names with vertical to avoid collisions
-      // e.g. food_search_restaurants, im_search_products
-      const prefix = vertical === "instamart" ? "im" : vertical
-      for (const [name, tool] of Object.entries(tools)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP tools have wider schema types
-        mergedTools[`${prefix}_${name}`] = tool as any
+    // Recreate clients and bind tools from the cached definitions
+    await Promise.all(
+      cachedData.connectedVerticals.map(async (vertical) => {
+        try {
+          const client = await createMCPClient({
+            transport: {
+              type: "http",
+              url: SWIGGY_MCP_SERVERS[vertical],
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            },
+          })
+          activeClients.push(client)
+
+          const defs = cachedData!.definitions[vertical]
+          const tools = client.toolsFromDefinitions(defs)
+
+          const prefix = vertical === "instamart" ? "im" : vertical
+          for (const [name, tool] of Object.entries(tools)) {
+            mergedTools[`${prefix}_${name}`] = tool
+          }
+          connectedVerticals.push(vertical)
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err)
+          errors.push({ vertical, error: errorMsg })
+          console.error(`[swiggy-mcp] Failed to bind cached tool definitions for ${vertical}:`, errorMsg)
+        }
+      })
+    )
+  } else {
+    console.log("[swiggy-mcp] Cache miss — connecting and discovering tools from scratch...")
+
+    const freshDefinitions: Partial<Record<SwiggyVertical, ListToolsResult>> = {}
+
+    const results = await Promise.allSettled(
+      verticals.map(async (vertical) => {
+        const client = await createMCPClient({
+          transport: {
+            type: "http",
+            url: SWIGGY_MCP_SERVERS[vertical],
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        })
+        activeClients.push(client)
+
+        // Discover tools and cache their definitions
+        const definitions = await client.listTools()
+        const tools = client.toolsFromDefinitions(definitions)
+
+        console.log(`[swiggy-mcp] ${vertical}: discovered ${Object.keys(tools).length} tools`)
+        return { vertical, definitions, tools }
+      })
+    )
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      const vertical = verticals[i]
+
+      if (result.status === "fulfilled") {
+        const { definitions, tools } = result.value
+        freshDefinitions[vertical] = definitions
+
+        const prefix = vertical === "instamart" ? "im" : vertical
+        for (const [name, tool] of Object.entries(tools)) {
+          mergedTools[`${prefix}_${name}`] = tool
+        }
+        connectedVerticals.push(vertical)
+      } else {
+        const errorMsg = result.reason instanceof Error ? result.reason.message : String(result.reason)
+        errors.push({ vertical, error: errorMsg })
+        console.error(`[swiggy-mcp] Failed to connect/discover tools from ${vertical}:`, errorMsg)
       }
-      connectedVerticals.push(vertical)
-    } else {
-      const errorMsg =
-        result.reason instanceof Error ? result.reason.message : String(result.reason)
-      errors.push({ vertical, error: errorMsg })
-      console.error(`[swiggy-mcp] Failed to connect to ${vertical}:`, errorMsg)
+    }
+
+    // Write definitions to Redis cache with 5-minute TTL
+    if (connectedVerticals.length > 0) {
+      try {
+        const cachePayload: CachedDefinitions = {
+          connectedVerticals,
+          definitions: freshDefinitions as Record<SwiggyVertical, ListToolsResult>,
+        }
+        await redisSet(cacheKey, JSON.stringify(cachePayload), 300) // 5 minutes TTL
+      } catch (err) {
+        console.warn("[swiggy-mcp] Failed to cache tool definitions in Redis:", err)
+      }
     }
   }
 
-  // Store in cache
-  const session: CachedMCPSession = {
-    tools: mergedTools as ToolSet,
-    connectedVerticals,
-    clients: activeClients,
-    createdAt: Date.now(),
-    tokenHash,
-  }
-  mcpCache.set(tokenHash, session)
-
-  // Cleanup function — for cached sessions, we DON'T close clients immediately.
-  // They'll be closed when the cache entry expires via evictStaleEntries().
-  // Only close if there were errors (partial connection).
+  // Cleanup function: Close active clients when stream ends to prevent socket leaks
   const cleanup = async () => {
-    // No-op: clients are kept alive in cache for reuse.
-    // They'll be cleaned up on cache eviction.
+    console.log(`[swiggy-mcp] Cleaning up ${activeClients.length} active client connections`)
+    await Promise.allSettled(activeClients.map((c) => c.close()))
   }
 
   return { tools: mergedTools as ToolSet, connectedVerticals, errors, cleanup }
 }
 
 /**
- * Force-close all cached MCP sessions. Call on server shutdown or
- * when a user disconnects their Swiggy account.
+ * Force-close cached MCP sessions.
  */
 export async function clearMCPCache(tokenHash?: string): Promise<void> {
   if (tokenHash) {
-    const session = mcpCache.get(tokenHash)
-    if (session) {
-      await Promise.allSettled(session.clients.map((c) => c.close()))
-      mcpCache.delete(tokenHash)
+    const cacheKey = `swiggy_mcp_tools:${tokenHash}`
+    if (typeof window === "undefined") {
+      const { redis } = await import("@/lib/redis")
+      if (redis) {
+        redis.del(cacheKey).catch(() => {})
+      }
     }
-  } else {
-    for (const [, session] of mcpCache) {
-      await Promise.allSettled(session.clients.map((c) => c.close()))
-    }
-    mcpCache.clear()
   }
 }

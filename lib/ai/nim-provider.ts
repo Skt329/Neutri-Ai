@@ -11,6 +11,35 @@
 
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
 const EMBED_MODEL = "nvidia/llama-3.2-nemoretriever-300m-embed-v1"
+const NIM_TIMEOUT_MS = 8_000
+const MAX_RETRIES = 1
+
+/** Fetch with timeout + retry */
+async function nimFetch(body: Record<string, unknown>): Promise<Response> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${NIM_BASE_URL}/embeddings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.NIM_API_KEY}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(NIM_TIMEOUT_MS),
+      })
+      if (res.ok || res.status < 500) return res // Don't retry client errors
+      lastError = new Error(`NIM ${res.status}: ${await res.text()}`)
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+    }
+    // Backoff before retry
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+    }
+  }
+  throw lastError ?? new Error("NIM embedding failed")
+}
 
 /**
  * Custom embed function for NeMo Retriever — an asymmetric model that
@@ -21,18 +50,11 @@ export async function nimEmbed(
   text: string,
   inputType: "query" | "passage",
 ): Promise<number[]> {
-  const res = await fetch(`${NIM_BASE_URL}/embeddings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.NIM_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: EMBED_MODEL,
-      input: [text],
-      input_type: inputType,
-      encoding_format: "float",
-    }),
+  const res = await nimFetch({
+    model: EMBED_MODEL,
+    input: [text],
+    input_type: inputType,
+    encoding_format: "float",
   })
 
   if (!res.ok) {
@@ -66,18 +88,11 @@ export async function nimEmbedBatch(
 ): Promise<number[][]> {
   if (texts.length === 0) return []
 
-  const res = await fetch(`${NIM_BASE_URL}/embeddings`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.NIM_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: EMBED_MODEL,
-      input: texts,
-      input_type: inputType,
-      encoding_format: "float",
-    }),
+  const res = await nimFetch({
+    model: EMBED_MODEL,
+    input: texts,
+    input_type: inputType,
+    encoding_format: "float",
   })
 
   if (!res.ok) {

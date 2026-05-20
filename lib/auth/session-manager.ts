@@ -10,6 +10,17 @@ interface CachedSession {
   timestamp: number
 }
 
+/**
+ * What we persist to localStorage — NO tokens, NO secrets.
+ * Only used as a "hint" for redirect logic so we don't flash
+ * the login page on every navigation.
+ */
+interface LocalStorageAuthHint {
+  isAuthenticated: boolean
+  userId: string | null
+  timestamp: number
+}
+
 class SessionManager {
   private cachedSession: CachedSession | null = null
   private sessionPromise: Promise<CachedSession> | null = null
@@ -17,7 +28,7 @@ class SessionManager {
   /**
    * Get current session with intelligent caching
    * - First check in-memory cache (instant)
-   * - Then check localStorage cache (fast)
+   * - Then check localStorage hint (fast, no secrets)
    * - Fall back to Supabase query (slower)
    * Eliminates repeated auth checks on every route change
    */
@@ -44,14 +55,18 @@ class SessionManager {
   private async fetchSession(): Promise<CachedSession> {
     const now = Date.now()
 
-    // Check localStorage cache first
-    const cached = this.getLocalStorageCache()
-    if (cached && now - cached.timestamp < SESSION_CACHE_TTL) {
-      this.cachedSession = cached
-      return cached
+    // Check localStorage hint first — if the hint says "not authenticated"
+    // or is expired, skip straight to Supabase. If it says "authenticated",
+    // still fetch from Supabase but we know the redirect guard can relax.
+    const hint = this.getLocalStorageHint()
+    if (hint && !hint.isAuthenticated && now - hint.timestamp < SESSION_CACHE_TTL) {
+      // User was recently unauthenticated — return empty session quickly
+      const empty: CachedSession = { user: null, session: null, timestamp: now }
+      this.cachedSession = empty
+      return empty
     }
 
-    // Query Supabase
+    // Query Supabase for the actual session
     try {
       const supabase = createClient()
       const {
@@ -64,9 +79,9 @@ class SessionManager {
         timestamp: now,
       }
 
-      // Cache in memory and localStorage
+      // Cache in memory and save a safe hint to localStorage
       this.cachedSession = result
-      this.setLocalStorageCache(result)
+      this.setLocalStorageHint(result)
 
       return result
     } catch (error) {
@@ -76,7 +91,11 @@ class SessionManager {
     }
   }
 
-  private getLocalStorageCache(): CachedSession | null {
+  /**
+   * Read the lightweight auth hint from localStorage.
+   * This NEVER contains tokens or session data.
+   */
+  private getLocalStorageHint(): LocalStorageAuthHint | null {
     try {
       if (typeof window === 'undefined') return null
       const cached = localStorage.getItem(SESSION_CACHE_KEY)
@@ -86,10 +105,19 @@ class SessionManager {
     }
   }
 
-  private setLocalStorageCache(session: CachedSession) {
+  /**
+   * Save a lightweight hint to localStorage.
+   * Only stores isAuthenticated flag + userId — no JWTs, no secrets.
+   */
+  private setLocalStorageHint(session: CachedSession) {
     try {
       if (typeof window === 'undefined') return
-      localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(session))
+      const hint: LocalStorageAuthHint = {
+        isAuthenticated: !!session.user,
+        userId: session.user?.id ?? null,
+        timestamp: session.timestamp,
+      }
+      localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(hint))
     } catch {
       // Silently fail if localStorage is unavailable
     }
@@ -130,9 +158,9 @@ class SessionManager {
 export const sessionManager = new SessionManager()
 
 /**
- * Hook for React components to check auth with caching
- * Eliminates repeated auth queries on component renders
+ * Helper to check auth session with caching.
+ * Renamed from useSessionCheck to avoid React Hook linter warnings.
  */
-export async function useSessionCheck() {
+export async function checkSession() {
   return sessionManager.getSession()
 }

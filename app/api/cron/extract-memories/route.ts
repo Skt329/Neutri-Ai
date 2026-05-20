@@ -141,28 +141,30 @@ async function processConversation(
   const SIMILARITY_THRESHOLD = 0.92
   const dedupedMemories: Array<{ content: string; embedding: number[] }> = []
 
-  for (let i = 0; i < memories.length; i++) {
-    const embedding = embeddings[i]
-    const content = memories[i]
-
-    // Check against existing stored memories using vector similarity
-    const { data: matches } = await admin.rpc("match_memories_for_user", {
-      p_user_id: userId,
-      query_embedding: JSON.stringify(embedding),
-      match_count: 1,
-      similarity_threshold: SIMILARITY_THRESHOLD,
+  const checkResults = await Promise.all(
+    memories.map(async (content, i) => {
+      const embedding = embeddings[i]
+      const { data: matches } = await admin.rpc("match_memories_for_user", {
+        p_user_id: userId,
+        query_embedding: JSON.stringify(embedding),
+        match_count: 1,
+        similarity_threshold: SIMILARITY_THRESHOLD,
+      })
+      return { content, embedding, duplicate: matches && matches.length > 0, match: matches?.[0] }
     })
+  )
 
-    if (matches && matches.length > 0) {
+  for (const res of checkResults) {
+    if (res.duplicate && res.match) {
       // A semantically similar memory already exists — skip
       console.log(
-        `[cron/extract-memories] Skipping semantic duplicate: "${content.slice(0, 60)}..." ` +
-        `(similar to: "${matches[0].content.slice(0, 60)}...", score: ${matches[0].similarity.toFixed(3)})`,
+        `[cron/extract-memories] Skipping semantic duplicate: "${res.content.slice(0, 60)}..." ` +
+        `(similar to: "${res.match.content.slice(0, 60)}...", score: ${res.match.similarity.toFixed(3)})`,
       )
       continue
     }
 
-    dedupedMemories.push({ content, embedding })
+    dedupedMemories.push({ content: res.content, embedding: res.embedding })
   }
 
   if (dedupedMemories.length === 0) {

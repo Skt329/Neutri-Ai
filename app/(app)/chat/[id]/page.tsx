@@ -40,7 +40,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       .from("messages")
       .select("id, role, parts, ordinal")
       .eq("conversation_id", id)
-      .order("ordinal", { ascending: true })
+      .order("ordinal", { ascending: false })
       .limit(200),
     getCachedTodayMeals(user.id, dayStart),
     getCachedTargets(user.id),
@@ -50,7 +50,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   // ── Reconstruct UIMessages with resolved client tool outputs ──
   const CLIENT_TOOLS = ["propose_meal_log", "ask_user", "choose_option", "propose_pantry_items"]
-  const rawMessages = msgsRes.data ?? []
+  const rawMessages = (msgsRes.data ?? []).reverse()
 
   const initial: UIMessage[] = rawMessages.map((r, msgIndex) => {
     const parts = (r.parts as any[]) ?? []

@@ -10,6 +10,7 @@
  */
 
 import type { NutritionLookupResult } from "./types"
+import { limitUSDA } from "@/lib/redis"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,21 +38,16 @@ export const USDA_DATA_TYPES = [
 
 export type USDADataType = (typeof USDA_DATA_TYPES)[number]
 
-// ── In-memory rate limiter (sliding window, 900/hr) ─────────────────────────
+// ── Upstash Redis rate limiter (sliding window, 900/hr) ─────────────────────────
 
-const RATE_LIMIT_WINDOW_MS = 3_600_000
-const RATE_LIMIT_MAX = 900
-const requestTimestamps: number[] = []
-
-function checkRateLimit(): boolean {
-  const now = Date.now()
-  // Evict stale entries
-  while (requestTimestamps.length > 0 && now - requestTimestamps[0] > RATE_LIMIT_WINDOW_MS) {
-    requestTimestamps.shift()
+async function checkRateLimit(): Promise<boolean> {
+  try {
+    const res = await limitUSDA()
+    return res.success
+  } catch (err) {
+    console.warn("[usda] Rate limiter error, default to true:", err)
+    return true
   }
-  if (requestTimestamps.length >= RATE_LIMIT_MAX) return false
-  requestTimestamps.push(now)
-  return true
 }
 
 // ── API helpers ──────────────────────────────────────────────────────────────
@@ -127,7 +123,7 @@ export interface USDASearchParams {
  * Returns normalized nutrition results sorted by data-type priority.
  */
 export async function searchUSDA(params: USDASearchParams): Promise<NutritionLookupResult[]> {
-  if (!checkRateLimit()) {
+  if (!(await checkRateLimit())) {
     console.warn("[usda] Rate limit reached (900/hr), skipping USDA search")
     return []
   }
@@ -142,9 +138,9 @@ export async function searchUSDA(params: USDASearchParams): Promise<NutritionLoo
     nutrients: [NUTRIENT_IDS.ENERGY, NUTRIENT_IDS.PROTEIN, NUTRIENT_IDS.CARBS, NUTRIENT_IDS.FAT, NUTRIENT_IDS.FIBER],
   }
 
-  const res = await fetchWithRetry(`${BASE_URL}/foods/search?api_key=${apiKey}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/foods/search`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
     body: JSON.stringify(body),
   })
 
@@ -158,14 +154,15 @@ export async function searchUSDA(params: USDASearchParams): Promise<NutritionLoo
  * Get full nutrient details for a specific USDA food by FDC ID.
  */
 export async function getUSDAFoodDetails(fdcId: number): Promise<NutritionLookupResult | null> {
-  if (!checkRateLimit()) {
+  if (!(await checkRateLimit())) {
     console.warn("[usda] Rate limit reached, skipping detail fetch")
     return null
   }
 
   const apiKey = getApiKey()
-  const res = await fetchWithRetry(`${BASE_URL}/food/${fdcId}?api_key=${apiKey}&nutrients=${Object.values(NUTRIENT_IDS).join(",")}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/food/${fdcId}?nutrients=${Object.values(NUTRIENT_IDS).join(",")}`, {
     method: "GET",
+    headers: { "X-Api-Key": apiKey },
   })
 
   const food: USDASearchFood = await res.json()

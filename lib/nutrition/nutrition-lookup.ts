@@ -73,7 +73,7 @@ async function readCache(cacheKey: string): Promise<NutritionLookupResult[] | nu
     if (new Date(data.expires_at) < new Date()) {
       // Expired — delete and return null
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(supabase as any).from("nutrition_cache").delete().eq("cache_key", cacheKey).then(() => {})
+      await (supabase as any).from("nutrition_cache").delete().eq("cache_key", cacheKey)
       return null
     }
 

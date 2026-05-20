@@ -31,7 +31,7 @@ export async function retrieveMemories(params: {
       p_user_id: params.userId,
       query_embedding: embedding,
       match_count: limit,
-      similarity_threshold: 0.3,
+      similarity_threshold: 0.5,
     })
 
     if (error) {

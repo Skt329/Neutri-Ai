@@ -11,31 +11,18 @@ import { computeStreakInfo } from "@/lib/streaks"
 import { computeMealGap } from "@/lib/meal-gaps"
 import { getValidToken, getSwiggyConnectionStatus } from "@/lib/swiggy/mcp/token-manager"
 import { getSwiggyMCPTools } from "@/lib/swiggy/mcp/client"
+import { limitChat } from "@/lib/redis"
+import { ChatRequestSchema } from "@/lib/validation/api-schemas"
+import { parseBody, apiError } from "@/lib/validation/with-validation"
+import { truncateMessages } from "@/lib/ai/context-manager"
+import { logger } from "@/lib/logger"
 
 // Use Node.js runtime for more reliable Supabase connectivity.
 // Edge runtime has stricter fetch timeout behavior that causes
 // ConnectTimeoutError on slow/intermittent connections.
 export const runtime = "nodejs"
 
-// ── Rate limiting (in-memory sliding window for serverless) ──────────
-// Keyed by userId → array of timestamps. Cleaned up per-request.
-const rateLimitMap = new Map<string, number[]>()
-const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute
-const RATE_LIMIT_MAX = 20 // max 20 requests per minute per user
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now()
-  const timestamps = rateLimitMap.get(userId) ?? []
-  // Remove entries older than the window
-  const valid = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
-  if (valid.length >= RATE_LIMIT_MAX) {
-    rateLimitMap.set(userId, valid)
-    return false // rate limited
-  }
-  valid.push(now)
-  rateLimitMap.set(userId, valid)
-  return true
-}
+// Rate limiting is handled via Upstash Redis (limitChat)
 
 async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
   try {
@@ -88,19 +75,22 @@ export async function POST(req: Request) {
       await new Promise((r) => setTimeout(r, 1000))
     }
   }
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!user) return apiError("Unauthorized", "UNAUTHORIZED", 401)
 
   // ── Rate limit check ──
-  if (!checkRateLimit(user.id)) {
-    return NextResponse.json(
-      { error: "Too many requests. Please wait a moment before sending another message." },
-      { status: 429 },
+  const ratelimit = await limitChat(user.id)
+  if (!ratelimit.success) {
+    return apiError(
+      "Too many requests. Please wait a moment before sending another message.",
+      "RATE_LIMITED",
+      429,
     )
   }
 
-  const body = (await req.json()) as { messages: UIMessage[]; conversationId: string }
-  const { messages, conversationId } = body
-  if (!conversationId) return NextResponse.json({ error: "conversationId required" }, { status: 400 })
+  // ── Validate request body ──
+  const parsed = await parseBody(req, ChatRequestSchema)
+  if (parsed instanceof NextResponse) return parsed
+  const { messages, conversationId } = parsed as { messages: UIMessage[]; conversationId: string }
 
   // Verify the conversation belongs to the user (RLS would block inserts otherwise, but fail fast)
   const { data: convo, error: convErr } = await supabase
@@ -228,7 +218,7 @@ export async function POST(req: Request) {
   })
 
   // Build core tools — when MCP is connected, exclude legacy adapter tools (MCP supersedes them)
-  const coreTools = buildTools(supabase, user.id)
+  const coreTools = buildTools(supabase, user.id, { timezone: profile?.timezone })
   if (swiggyConnected) {
     delete (coreTools as Record<string, unknown>).swiggy_search
     delete (coreTools as Record<string, unknown>).swiggy_get_menu
@@ -266,11 +256,11 @@ export async function POST(req: Request) {
     model: azureChatModel,
     maxOutputTokens: 4096,
     system,
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(truncateMessages(messages)),
     tools,
     // Stop the multi-step loop when a client tool is called (no execute fn)
     // OR after 12 server-side steps (safety limit against infinite loops).
-    stopWhen: [...CLIENT_TOOL_NAMES.map((n) => hasToolCall(n)), stepCountIs(12)],
+    stopWhen: [...CLIENT_TOOL_NAMES.map((n) => hasToolCall(n)), stepCountIs(6)],
     // Vercel AI SDK built-in telemetry (OpenTelemetry compatible)
     experimental_telemetry: {
       isEnabled: true,
