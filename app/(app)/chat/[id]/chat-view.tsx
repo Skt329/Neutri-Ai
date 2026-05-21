@@ -439,7 +439,7 @@ export function ChatView({
 
       {/* Messages area — indicator is OUTSIDE scroll container */}
       <div className="relative flex-1 min-h-0">
-        <div ref={scrollRef} className="h-full overflow-y-auto" style={{ contentVisibility: 'auto' }}>
+        <div ref={scrollRef} className="h-full overflow-y-auto" role="log" aria-live="polite" aria-label="Chat messages" style={{ contentVisibility: 'auto' }}>
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-6">
             {isEmpty ? <Suggestions onPick={(t) => sendText(t)} /> : null}
             {messages.map((m, idx) => (

@@ -16,7 +16,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <NutriShell userName={profile?.full_name ?? null}>
-      {children}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-forest focus:text-white focus:rounded-lg"
+      >
+        Skip to content
+      </a>
+      <main id="main-content">
+        {children}
+      </main>
     </NutriShell>
   )
 }

@@ -20,19 +20,20 @@ export function MobileBottomNav() {
   if (isInChat) return null
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center h-[60px] safe-area-pb">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center h-[60px] safe-area-pb" aria-label="Main navigation">
       {TABS.map(({ href, label, icon: Icon }) => {
         const active = pathname?.startsWith(href)
         return (
           <Link
             key={href}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
               'flex flex-col items-center justify-center gap-0.5 flex-1 h-full smooth-hover',
               active ? 'text-forest' : 'text-fog'
             )}
           >
-            <Icon className={cn('size-5', active && 'animate-bounce-subtle')} />
+            <Icon className={cn('size-5', active && 'animate-bounce-subtle')} aria-hidden="true" />
             <span className="text-[10px] font-semibold uppercase tracking-wider">
               {label}
             </span>

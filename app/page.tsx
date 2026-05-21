@@ -19,6 +19,25 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            name: "NeutriAI",
+            description: "AI-powered nutrition coaching. Log meals, track macros, generate recipes, and order food through natural conversation.",
+            applicationCategory: "HealthApplication",
+            operatingSystem: "Web",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            featureList: [
+              "AI meal logging", "Macro tracking", "Pantry management",
+              "Recipe generation", "Swiggy integration", "Streak tracking",
+            ],
+          }),
+        }}
+      />
       {/* ── Navigation ── */}
       <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">

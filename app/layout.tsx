@@ -19,10 +19,24 @@ const fraunces = Fraunces({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://neutri.ai"),
   title: "NeutriAI — Your AI Dietitian",
   description:
     "Personalized nutrition coaching powered by AI. Log meals, hit your macros, and build lasting habits with a dietitian in your pocket.",
   generator: "v0.app",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "NeutriAI — Your AI Dietitian",
+    description: "Log meals through conversation. Get TDEE-based macro targets. Generate recipes from your pantry.",
+    siteName: "NeutriAI",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NeutriAI — Your AI Dietitian",
+    description: "Chat with an AI dietitian that logs meals, tracks macros, and orders food — all through natural conversation.",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
