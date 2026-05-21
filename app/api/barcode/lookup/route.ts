@@ -5,33 +5,17 @@
  * Wraps the existing lookupNutrition() orchestrator with barcode mode.
  */
 
-import { NextResponse, type NextRequest } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
+import { withAuth } from "@/lib/api/with-auth"
 import { lookupNutrition } from "@/lib/nutrition/nutrition-lookup"
+import { BarcodeRequestSchema } from "@/lib/validation/api-schemas"
+import { parseBody, apiError } from "@/lib/validation/with-validation"
 
-export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
-  }
-
-  let body: { barcode?: string }
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
-
-  const barcode = body.barcode?.trim()
-  if (!barcode || barcode.length < 8 || !/^\d+$/.test(barcode)) {
-    return NextResponse.json(
-      { error: "Invalid barcode. Expected 8–14 digit EAN/UPC." },
-      { status: 400 },
-    )
-  }
+export const POST = withAuth(async (req, { user }) => {
+  // Validate barcode format with Zod
+  const parsed = await parseBody(req, BarcodeRequestSchema)
+  if (parsed instanceof NextResponse) return parsed
+  const { barcode } = parsed
 
   try {
     const results = await lookupNutrition(barcode, { barcode })
@@ -56,7 +40,6 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (err) {
-    console.error("[api/barcode/lookup]", err)
-    return NextResponse.json({ error: "Barcode lookup failed" }, { status: 502 })
+    return apiError("Barcode lookup failed", "LOOKUP_FAILED", 502)
   }
-}
+})

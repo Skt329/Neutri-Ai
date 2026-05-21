@@ -38,6 +38,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${profileUrl}?swiggy=error&reason=missing_code`)
   }
 
+  // Validate OAuth state to prevent CSRF
+  const stateParam = url.searchParams.get("state")
+  const storedState = req.cookies.get("swiggy_oauth_state")?.value
+  if (!stateParam || !storedState || stateParam !== storedState) {
+    return NextResponse.redirect(`${profileUrl}?swiggy=error&reason=invalid_state`)
+  }
+
   // Retrieve PKCE verifier from cookie
   const codeVerifier = req.cookies.get("swiggy_pkce_verifier")?.value
   if (!codeVerifier) {
@@ -61,9 +68,14 @@ export async function GET(req: NextRequest) {
 
     await storeToken(supabase, user.id, tokenData)
 
-    // Clear the PKCE cookie
+    // Clear the PKCE and state cookies
     const response = NextResponse.redirect(`${profileUrl}?swiggy=connected`)
     response.cookies.set("swiggy_pkce_verifier", "", {
+      httpOnly: true,
+      maxAge: 0,
+      path: "/api/swiggy",
+    })
+    response.cookies.set("swiggy_oauth_state", "", {
       httpOnly: true,
       maxAge: 0,
       path: "/api/swiggy",

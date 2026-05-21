@@ -1,46 +1,24 @@
-import { convertToModelMessages, generateText, hasToolCall, stepCountIs, streamText, type UIMessage } from "ai"
+import { convertToModelMessages, hasToolCall, stepCountIs, streamText, type UIMessage } from "ai"
 import { azureChatModel } from "@/lib/ai/azure-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { buildTools, buildSwiggySmartTools, CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
 import { buildSystemPrompt } from "@/lib/ai/system-prompt"
-import { retrieveMemories } from "@/lib/ai/memory"
-import type { NutritionTargets, Profile } from "@/lib/types"
-import { sumTotals } from "@/lib/nutrition"
-import { computeStreakInfo } from "@/lib/streaks"
-import { computeMealGap } from "@/lib/meal-gaps"
 import { getValidToken, getSwiggyConnectionStatus } from "@/lib/swiggy/mcp/token-manager"
 import { getSwiggyMCPTools } from "@/lib/swiggy/mcp/client"
-import { limitChat } from "@/lib/redis"
+import { limitChat, trackTokenUsage } from "@/lib/redis"
 import { ChatRequestSchema } from "@/lib/validation/api-schemas"
 import { parseBody, apiError } from "@/lib/validation/with-validation"
 import { truncateMessages } from "@/lib/ai/context-manager"
-import { logger } from "@/lib/logger"
+import { createRequestLogger } from "@/lib/logger"
+import { loadChatContext } from "@/lib/ai/chat-context"
+import { persistMessages } from "@/lib/ai/chat-persistence"
+import { invalidateMealCache, invalidateProfileCache, invalidateTargetsCache } from "@/lib/ai/context-cache"
 
-// Use Node.js runtime for more reliable Supabase connectivity.
-// Edge runtime has stricter fetch timeout behavior that causes
-// ConnectTimeoutError on slow/intermittent connections.
 export const runtime = "nodejs"
+export const maxDuration = 60
 
-// Rate limiting is handled via Upstash Redis (limitChat)
-
-async function generateConversationTitle(userText: string, assistantText: string): Promise<string | null> {
-  try {
-    const { text } = await generateText({
-      model: azureChatModel,
-      maxOutputTokens: 32,
-      prompt:
-        "Create a short, specific chat title (3 to 6 words, no quotes, no punctuation at the end, Title Case). " +
-        "Base it on the user's intent from this exchange.\n\n" +
-        `User: ${userText.slice(0, 500)}\n` +
-        `Assistant: ${assistantText.slice(0, 500)}`,
-    })
-    const clean = text.replace(/["'`]/g, "").replace(/[.!?,:;\s]+$/g, "").trim()
-    return clean ? clean.slice(0, 60) : null
-  } catch {
-    return null
-  }
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function messageToText(m: UIMessage): string {
   if (!m.parts || !Array.isArray(m.parts)) return ""
@@ -51,143 +29,40 @@ function messageToText(m: UIMessage): string {
     .trim()
 }
 
-export const maxDuration = 60
-
-export async function POST(req: Request) {
-  const supabase = await createClient()
-
-  // Retry auth once if the first attempt times out (transient network issues)
-  let user = null
+async function authenticateUser(supabase: Awaited<ReturnType<typeof createClient>>, log: ReturnType<typeof createRequestLogger>) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { data } = await supabase.auth.getUser()
-      user = data.user
-      break
+      return data.user
     } catch (err) {
-      console.warn(`[chat] auth.getUser() attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err)
-      if (attempt === 1) {
-        return NextResponse.json(
-          { error: "Authentication timed out. Please refresh and try again." },
-          { status: 503 },
-        )
-      }
-      // Brief pause before retry
+      log.warn("chat", `auth.getUser() attempt ${attempt + 1} failed`, {
+        error: err instanceof Error ? err.message : String(err),
+      })
+      if (attempt === 1) return null
       await new Promise((r) => setTimeout(r, 1000))
     }
   }
-  if (!user) return apiError("Unauthorized", "UNAUTHORIZED", 401)
+  return null
+}
 
-  // ── Rate limit check ──
-  const ratelimit = await limitChat(user.id)
-  if (!ratelimit.success) {
-    return apiError(
-      "Too many requests. Please wait a moment before sending another message.",
-      "RATE_LIMITED",
-      429,
-    )
-  }
+// ── Swiggy MCP setup ─────────────────────────────────────────────────────────
 
-  // ── Validate request body ──
-  const parsed = await parseBody(req, ChatRequestSchema)
-  if (parsed instanceof NextResponse) return parsed
-  const { messages, conversationId } = parsed as { messages: UIMessage[]; conversationId: string }
-
-  // Verify the conversation belongs to the user (RLS would block inserts otherwise, but fail fast)
-  const { data: convo, error: convErr } = await supabase
-    .from("conversations")
-    .select("id, title")
-    .eq("id", conversationId)
-    .eq("user_id", user.id)
-    .maybeSingle()
-  if (convErr || !convo) return NextResponse.json({ error: "Conversation not found" }, { status: 404 })
-  const existingTitle = convo.title as string | null
-
-  // Load context in parallel
-  const now = new Date()
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
-  const lastUserText = lastUserMessage ? messageToText(lastUserMessage) : ""
-
-  // 8-day window is sufficient for streak computation (consecutive days).
-  // The original 45-day scan fetched hundreds of unnecessary rows.
-  const streakSince = new Date(Date.now() - 8 * 24 * 3600 * 1000).toISOString()
-  const [
-    { data: profile },
-    { data: targets },
-    { data: todayMeals },
-    { data: streakMeals },
-    vectorMemories,
-  ] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>(),
-    supabase
-      .from("nutrition_targets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle<NutritionTargets>(),
-    supabase
-      .from("meal_logs")
-      .select("logged_at, calories, protein_g, carbs_g, fat_g, fiber_g")
-      .eq("user_id", user.id)
-      .gte("logged_at", dayStart),
-    supabase
-      .from("meal_logs")
-      .select("logged_at")
-      .eq("user_id", user.id)
-      .gte("logged_at", streakSince),
-    retrieveMemories({ userId: user.id, query: lastUserText, limit: 6 }),
-  ])
-
-  // Fallback: if the vector search returned nothing (e.g. no embeddings yet),
-  // surface the most recent memories so the assistant still has long-term context.
-  let memories: Array<{ content: string }> = vectorMemories.map((content) => ({ content }))
-  if (memories.length === 0) {
-    const { data: recent } = await supabase
-      .from("memories")
-      .select("content")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(10)
-    memories = recent ?? []
-  }
-
-  const totals = sumTotals(todayMeals ?? [])
-  const streak = computeStreakInfo(
-    (streakMeals ?? []).map((m) => m.logged_at),
-    profile?.timezone || "UTC",
-  )
-  const gap = computeMealGap(
-    (todayMeals ?? []).map((m) => ({
-      id: "",
-      user_id: user.id,
-      logged_at: m.logged_at,
-      meal_type: null,
-      description: "",
-      calories: m.calories ?? 0,
-      protein_g: m.protein_g ?? 0,
-      carbs_g: m.carbs_g ?? 0,
-      fat_g: m.fat_g ?? 0,
-      fiber_g: m.fiber_g ?? 0,
-      items: [],
-      source: "chat",
-      created_at: "",
-    })),
-    now,
-  )
-  // ── Swiggy MCP integration (conditional) ──
+async function loadSwiggyTools(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  log: ReturnType<typeof createRequestLogger>,
+) {
   let swiggyTools: Record<string, any> = {}
   let swiggyConnected = false
   let swiggyExpiringSoon = false
   let swiggyCleanup: (() => Promise<void>) | null = null
+
   try {
-    const swiggyToken = await getValidToken(supabase, user.id)
+    const swiggyToken = await getValidToken(supabase, userId)
     if (swiggyToken) {
       swiggyConnected = true
-      const swiggyStatus = await getSwiggyConnectionStatus(supabase, user.id)
+      const swiggyStatus = await getSwiggyConnectionStatus(supabase, userId)
       swiggyExpiringSoon = swiggyStatus.expiringSoon
-      // MCP discovery with 8s timeout to prevent blocking on slow Swiggy servers
       const mcpResult = await Promise.race([
         getSwiggyMCPTools(swiggyToken),
         new Promise<never>((_, reject) =>
@@ -196,53 +71,103 @@ export async function POST(req: Request) {
       ])
       swiggyTools = mcpResult.tools
       swiggyCleanup = mcpResult.cleanup
-      console.log(`[chat] Swiggy MCP: ${Object.keys(mcpResult.tools).length} tools loaded`)
+      log.info("chat", `Swiggy MCP: ${Object.keys(mcpResult.tools).length} tools loaded`)
       if (mcpResult.errors.length > 0) {
-        console.warn("[chat] Swiggy MCP partial failures:", mcpResult.errors)
+        log.warn("chat", "Swiggy MCP partial failures", { errors: mcpResult.errors })
       }
     }
   } catch (err) {
-    console.warn("[chat] Swiggy MCP init failed (non-blocking):", err instanceof Error ? err.message : err)
+    log.warn("chat", "Swiggy MCP init failed (non-blocking)", {
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 
+  return { swiggyTools, swiggyConnected, swiggyExpiringSoon, swiggyCleanup }
+}
+
+// ── Main handler ─────────────────────────────────────────────────────────────
+
+export async function POST(req: Request) {
+  const requestId = crypto.randomUUID().slice(0, 8)
+  const log = createRequestLogger(requestId)
+  const supabase = await createClient()
+
+  // ── Auth ──
+  const user = await authenticateUser(supabase, log)
+  if (!user) return apiError("Unauthorized", "UNAUTHORIZED", 401)
+
+  // ── Rate limit ──
+  const ratelimit = await limitChat(user.id)
+  if (!ratelimit.success) {
+    return apiError("Too many requests. Please wait a moment.", "RATE_LIMITED", 429)
+  }
+
+  // ── Validate request body ──
+  const parsed = await parseBody(req, ChatRequestSchema)
+  if (parsed instanceof NextResponse) return parsed
+  const { messages, conversationId } = parsed as { messages: UIMessage[]; conversationId: string }
+
+  // ── Verify conversation ownership ──
+  const { data: convo, error: convErr } = await supabase
+    .from("conversations")
+    .select("id, title")
+    .eq("id", conversationId)
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (convErr || !convo) return apiError("Conversation not found", "NOT_FOUND", 404)
+  const existingTitle = convo.title as string | null
+
+  // ── Load context ──
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
+  const lastUserText = lastUserMessage ? messageToText(lastUserMessage) : ""
+  const ctx = await loadChatContext(supabase, user.id, lastUserText)
+
+  if (ctx.cacheHits > 0) {
+    log.debug("chat", `Context cache: ${ctx.cacheHits}/5 hits`)
+  }
+
+  // ── Swiggy MCP ──
+  const { swiggyTools, swiggyConnected, swiggyExpiringSoon, swiggyCleanup } =
+    await loadSwiggyTools(supabase, user.id, log)
+
+  // ── Build system prompt ──
   const system = buildSystemPrompt({
-    profile,
-    targets,
-    memories,
-    dailyTotals: totals,
-    currentDateISO: now.toISOString(),
-    streak,
-    mealGapHours: gap?.hours ?? null,
+    profile: ctx.profile,
+    targets: ctx.targets,
+    memories: ctx.memories,
+    dailyTotals: ctx.totals,
+    currentDateISO: new Date().toISOString(),
+    streak: ctx.streak,
+    mealGapHours: ctx.gap?.hours ?? null,
     swiggyConnected,
     swiggyExpiringSoon,
   })
 
-  // Build core tools — when MCP is connected, exclude legacy adapter tools (MCP supersedes them)
-  const coreTools = buildTools(supabase, user.id, { timezone: profile?.timezone })
+  // ── Build tools ──
+  const coreTools = buildTools(supabase, user.id, { timezone: ctx.profile?.timezone })
   if (swiggyConnected) {
     delete (coreTools as Record<string, unknown>).swiggy_search
     delete (coreTools as Record<string, unknown>).swiggy_get_menu
     delete (coreTools as Record<string, unknown>).swiggy_place_order
   }
 
-  // Pre-loaded dietary context for smart tools (avoids redundant DB queries)
   const preloadedCtx = {
-    profile: profile
+    profile: ctx.profile
       ? {
-          dietary_preferences: profile.dietary_preferences ?? [],
-          allergies: profile.allergies ?? [],
-          health_conditions: profile.health_conditions ?? [],
+          dietary_preferences: ctx.profile.dietary_preferences ?? [],
+          allergies: ctx.profile.allergies ?? [],
+          health_conditions: ctx.profile.health_conditions ?? [],
         }
       : null,
-    targets: targets
+    targets: ctx.targets
       ? {
-          calories: targets.calories,
-          protein_g: targets.protein_g,
-          carbs_g: targets.carbs_g,
-          fat_g: targets.fat_g,
+          calories: ctx.targets.calories,
+          protein_g: ctx.targets.protein_g,
+          carbs_g: ctx.targets.carbs_g,
+          fat_g: ctx.targets.fat_g,
         }
       : null,
-    dailyTotals: totals,
+    dailyTotals: ctx.totals,
   }
 
   const tools = {
@@ -251,34 +176,41 @@ export async function POST(req: Request) {
     ...swiggyTools,
   }
 
+  // ── Stream ──
   const result = streamText({
-    // Azure OpenAI: GPT-4.1 mini — native tool calling, parallel tool calls, structured output.
     model: azureChatModel,
     maxOutputTokens: 4096,
     system,
     messages: await convertToModelMessages(truncateMessages(messages)),
     tools,
-    // Stop the multi-step loop when a client tool is called (no execute fn)
-    // OR after 12 server-side steps (safety limit against infinite loops).
     stopWhen: [...CLIENT_TOOL_NAMES.map((n) => hasToolCall(n)), stepCountIs(6)],
-    // Vercel AI SDK built-in telemetry (OpenTelemetry compatible)
     experimental_telemetry: {
       isEnabled: true,
       functionId: "neutri-chat",
-      metadata: {
-        userId: user.id,
-        conversationId,
-      },
+      metadata: { userId: user.id, conversationId },
     },
     onError: ({ error }) => {
-      console.error("[chat] streamText error:", error)
+      log.error("chat", "streamText error", { error: error instanceof Error ? error.message : String(error) })
     },
     onStepFinish: ({ toolCalls, toolResults, text }) => {
-      console.log("[chat] step finished:", {
+      log.debug("chat", "step finished", {
         textLength: text?.length ?? 0,
         toolCalls: toolCalls?.map((tc: any) => ({ name: tc.toolName, id: tc.toolCallId })),
         toolResults: toolResults?.map((tr: any) => ({ name: tr.toolName, id: tr.toolCallId, hasResult: !!tr.result })),
       })
+
+      if (toolCalls) {
+        for (const tc of toolCalls) {
+          if (!tc) continue
+          if (tc.toolName === "log_meal" || tc.toolName === "delete_meal") {
+            invalidateMealCache(user.id).catch(() => {})
+          } else if (tc.toolName === "update_profile") {
+            invalidateProfileCache(user.id).catch(() => {})
+          } else if (tc.toolName === "set_targets") {
+            invalidateTargetsCache(user.id).catch(() => {})
+          }
+        }
+      }
     },
   })
 
@@ -286,80 +218,25 @@ export async function POST(req: Request) {
     originalMessages: messages,
     async onFinish({ messages: finishedMessages }) {
       try {
-        const { count, data: ordinalRow } = await supabase
-          .from("messages")
-          .select("ordinal", { count: "exact", head: false })
-          .eq("conversation_id", conversationId)
-          .order("ordinal", { ascending: false })
-          .limit(1)
-
-        const savedCount = count ?? 0
-        const maxOrdinal = ordinalRow?.[0]?.ordinal ?? -1
-        const newMessages = finishedMessages.slice(savedCount)
-
-        if (newMessages.length > 0) {
-          const rows = newMessages.map((m, i) => ({
-            conversation_id: conversationId,
-            user_id: user.id,
-            role: m.role,
-            parts: m.parts as unknown,
-            ordinal: maxOrdinal + 1 + i,
-          }))
-          const { error: insertErr } = await supabase.from("messages").insert(rows)
-          if (insertErr) {
-            console.error("[chat] Failed to insert new messages:", insertErr.message)
-          }
-        }
-
-        // Update last pre-existing message if its parts have grown
-        // (e.g. tool output + follow-up text added after user confirmation)
-        if (savedCount > 0 && finishedMessages.length >= savedCount) {
-          const lastPreExisting = finishedMessages[savedCount - 1]
-          const hasToolParts = lastPreExisting.parts.some(
-            (p) => p.type === "tool-invocation" || (p.type.startsWith("tool-") && p.type !== "tool-invocation"),
-          )
-          if (hasToolParts) {
-            const { error: updateErr } = await supabase
-              .from("messages")
-              .update({ parts: lastPreExisting.parts as unknown })
-              .eq("conversation_id", conversationId)
-              .eq("ordinal", maxOrdinal)
-            if (updateErr) {
-              console.error("[chat] Failed to update existing message parts:", updateErr.message)
-            }
-          }
-        }
-
-        // ── Update conversation timestamp ──
-        await supabase
-          .from("conversations")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", conversationId)
-
-        // ── Fire-and-forget title generation (non-blocking) ──
-        if (!existingTitle) {
-          const assistantText = finishedMessages
-            .filter((m) => m.role === "assistant")
-            .map((m) => messageToText(m))
-            .join("\n")
-            .trim()
-
-          if (lastUserText || assistantText) {
-            // Don't await — let it run in the background
-            generateConversationTitle(lastUserText, assistantText).then((title) => {
-              if (title) {
-                supabase.from("conversations").update({ title }).eq("id", conversationId).then(() => {})
-              }
+        // Track token usage (fire-and-forget)
+        Promise.resolve(result.totalUsage).then((usage) => {
+          if (usage) {
+            trackTokenUsage(user.id, {
+              promptTokens: usage.inputTokens ?? 0,
+              completionTokens: usage.outputTokens ?? 0,
+              totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
             }).catch(() => {})
           }
-        }
+        }).catch(() => {})
 
-        // Memory extraction is handled by the deferred cron job
-        // (POST /api/cron/extract-memories) — no inline extraction here.
+        // Persist messages
+        await persistMessages({
+          supabase, userId: user.id, conversationId, existingTitle,
+          messages, finishedMessages, log,
+        })
       } catch (e) {
-        console.error("[chat] Failed to persist messages:", e)
+        log.error("chat", "Failed to persist messages", { error: e instanceof Error ? e.message : String(e) })
       } finally {
-        // Release Swiggy MCP connections after stream is done
         if (swiggyCleanup) {
           swiggyCleanup().catch(() => {})
         }

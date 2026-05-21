@@ -48,3 +48,27 @@ export const NutritionRequestSchema = z
   })
 
 export type NutritionRequest = z.infer<typeof NutritionRequestSchema>
+
+// ── Barcode API ──────────────────────────────────────────────────────────────
+
+export const BarcodeRequestSchema = z.object({
+  barcode: z.string().trim().regex(/^\d{8,14}$/, "Barcode must be 8-14 digits"),
+})
+
+export type BarcodeRequest = z.infer<typeof BarcodeRequestSchema>
+
+// ── Streak API ───────────────────────────────────────────────────────────────
+
+export const StreakQuerySchema = z.object({
+  timezone: z.string().max(50).optional(),
+})
+
+export type StreakQuery = z.infer<typeof StreakQuerySchema>
+
+// ── Swiggy Connect ───────────────────────────────────────────────────────────
+
+export const SwiggyConnectSchema = z.object({
+  redirect_uri: z.string().url().optional(),
+})
+
+export type SwiggyConnect = z.infer<typeof SwiggyConnectSchema>

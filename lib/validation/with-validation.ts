@@ -22,6 +22,13 @@ export function apiError(
   return NextResponse.json({ error: message, code, details }, { status })
 }
 
+/**
+ * Create a standardized JSON success response.
+ */
+export function apiSuccess<T>(data: T, status = 200): NextResponse<T> {
+  return NextResponse.json(data, { status })
+}
+
 // ── Request body parsing ─────────────────────────────────────────────────────
 
 /**
@@ -53,6 +60,41 @@ export async function parseBody<T>(
     if (e instanceof ZodError) {
       return apiError(
         "Validation failed",
+        "VALIDATION_ERROR",
+        400,
+        e.errors.map((err) => ({
+          path: err.path.join("."),
+          message: err.message,
+        })),
+      )
+    }
+    return apiError("Bad request", "BAD_REQUEST", 400)
+  }
+}
+
+// ── Query parameter parsing ──────────────────────────────────────────────────
+
+/**
+ * Parse and validate URL search params against a Zod schema.
+ * Use for GET endpoints that accept query parameters.
+ *
+ * @returns Parsed data on success, or a NextResponse error on failure.
+ */
+export function parseQuery<T>(
+  searchParams: URLSearchParams,
+  schema: ZodSchema<T>,
+): T | NextResponse<APIErrorResponse> {
+  const raw: Record<string, string> = {}
+  searchParams.forEach((value, key) => {
+    raw[key] = value
+  })
+
+  try {
+    return schema.parse(raw)
+  } catch (e) {
+    if (e instanceof ZodError) {
+      return apiError(
+        "Invalid query parameters",
         "VALIDATION_ERROR",
         400,
         e.errors.map((err) => ({

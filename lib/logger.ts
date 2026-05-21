@@ -56,3 +56,22 @@ export const logger = {
   error: (module: string, msg: string, data?: Record<string, unknown>) =>
     log("error", module, msg, data),
 }
+
+export type Logger = typeof logger
+
+/**
+ * Create a scoped logger that automatically injects a request ID
+ * into every log entry for end-to-end request tracing.
+ */
+export function createRequestLogger(requestId: string) {
+  return {
+    debug: (module: string, msg: string, data?: Record<string, unknown>) =>
+      log("debug", module, msg, { ...data, requestId }),
+    info: (module: string, msg: string, data?: Record<string, unknown>) =>
+      log("info", module, msg, { ...data, requestId }),
+    warn: (module: string, msg: string, data?: Record<string, unknown>) =>
+      log("warn", module, msg, { ...data, requestId }),
+    error: (module: string, msg: string, data?: Record<string, unknown>) =>
+      log("error", module, msg, { ...data, requestId }),
+  }
+}

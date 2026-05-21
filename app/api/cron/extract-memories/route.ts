@@ -4,6 +4,7 @@ import { z } from "zod"
 import { azureChatModel } from "@/lib/ai/azure-provider"
 import { nimEmbedBatch } from "@/lib/ai/nim-provider"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min max for cron jobs
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     )
 
     if (queryErr) {
-      console.error("[cron/extract-memories] Query failed:", queryErr.message)
+      logger.error("cron/extract-memories", "Query failed", { error: queryErr.message })
       return NextResponse.json({ error: queryErr.message }, { status: 500 })
     }
 
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ processed: 0, message: "No conversations need extraction" })
     }
 
-    console.log(`[cron/extract-memories] Processing ${staleConvos.length} conversations`)
+    logger.info("cron/extract-memories", `Processing ${staleConvos.length} conversations`)
 
     let totalMemories = 0
     const results: Array<{ conversationId: string; memories: number; error?: string }> = []
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
         results.push({ conversationId: convo.conversation_id, memories: count })
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error"
-        console.error(`[cron/extract-memories] Failed for ${convo.conversation_id}:`, msg)
+        logger.error("cron/extract-memories", `Failed for ${convo.conversation_id}`, { error: msg })
         results.push({ conversationId: convo.conversation_id, memories: 0, error: msg })
       }
     }
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
       results,
     })
   } catch (err) {
-    console.error("[cron/extract-memories] Cron failed:", err)
+    logger.error("cron/extract-memories", "Cron failed", { error: err instanceof Error ? err.message : String(err) })
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 },
@@ -157,10 +158,11 @@ async function processConversation(
   for (const res of checkResults) {
     if (res.duplicate && res.match) {
       // A semantically similar memory already exists — skip
-      console.log(
-        `[cron/extract-memories] Skipping semantic duplicate: "${res.content.slice(0, 60)}..." ` +
-        `(similar to: "${res.match.content.slice(0, 60)}...", score: ${res.match.similarity.toFixed(3)})`,
-      )
+      logger.debug("cron/extract-memories", "Skipping semantic duplicate", {
+        content: res.content.slice(0, 60),
+        similarTo: res.match.content.slice(0, 60),
+        score: res.match.similarity.toFixed(3),
+      })
       continue
     }
 
@@ -168,7 +170,7 @@ async function processConversation(
   }
 
   if (dedupedMemories.length === 0) {
-    console.log(`[cron/extract-memories] ${conversationId}: all ${memories.length} memories were semantic duplicates`)
+    logger.info("cron/extract-memories", `${conversationId}: all ${memories.length} memories were semantic duplicates`)
     await admin.rpc("mark_conversation_extracted", { p_conversation_id: conversationId })
     return 0
   }
@@ -183,17 +185,16 @@ async function processConversation(
 
   const { error: insertErr } = await admin.from("memories").insert(rows)
   if (insertErr) {
-    console.error(`[cron/extract-memories] Insert failed for ${conversationId}:`, insertErr.message)
+    logger.error("cron/extract-memories", `Insert failed for ${conversationId}`, { error: insertErr.message })
     throw new Error(insertErr.message)
   }
 
   // 6. Mark conversation as extracted
   await admin.rpc("mark_conversation_extracted", { p_conversation_id: conversationId })
 
-  console.log(
-    `[cron/extract-memories] ${conversationId}: extracted ${dedupedMemories.length} new memories ` +
-    `(${memories.length - dedupedMemories.length} semantic duplicates skipped)`,
-  )
+  logger.info("cron/extract-memories", `${conversationId}: extracted ${dedupedMemories.length} new memories`, {
+    duplicatesSkipped: memories.length - dedupedMemories.length,
+  })
   return dedupedMemories.length
 }
 
@@ -225,7 +226,9 @@ Rules:
 
     return output?.memories ?? []
   } catch (err) {
-    console.error("[cron/extract-memories] Structured extraction failed:", err instanceof Error ? err.message : err)
+    logger.error("cron/extract-memories", "Structured extraction failed", {
+      error: err instanceof Error ? err.message : String(err),
+    })
     return []
   }
 }

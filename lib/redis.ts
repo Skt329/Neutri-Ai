@@ -202,3 +202,85 @@ export const limitNutrition = async (userId: string): Promise<RateLimitResult> =
   return memoryLimit(`nutrition:${userId}`, 10, 60_000)
 }
 
+// ── Per-User Token Usage Tracking ──────────────────────────────────────
+
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/**
+ * Track token usage for a user. Stores daily and monthly counters in Redis.
+ * Keys auto-expire so there's no cleanup needed.
+ */
+export async function trackTokenUsage(userId: string, tokens: TokenUsage): Promise<void> {
+  const now = new Date()
+  const dayKey = `tokens:${userId}:${now.toISOString().slice(0, 10)}`    // tokens:uid:2026-05-21
+  const monthKey = `tokens:${userId}:${now.toISOString().slice(0, 7)}`   // tokens:uid:2026-05
+
+  if (redis) {
+    try {
+      // Use pipeline for atomicity and efficiency
+      const pipe = redis.pipeline()
+      pipe.incrby(`${dayKey}:prompt`, tokens.promptTokens)
+      pipe.incrby(`${dayKey}:completion`, tokens.completionTokens)
+      pipe.incrby(`${dayKey}:total`, tokens.totalTokens)
+      pipe.expire(`${dayKey}:prompt`, 172800)      // 48h TTL
+      pipe.expire(`${dayKey}:completion`, 172800)
+      pipe.expire(`${dayKey}:total`, 172800)
+      pipe.incrby(`${monthKey}:prompt`, tokens.promptTokens)
+      pipe.incrby(`${monthKey}:completion`, tokens.completionTokens)
+      pipe.incrby(`${monthKey}:total`, tokens.totalTokens)
+      pipe.expire(`${monthKey}:prompt`, 3024000)   // 35 day TTL
+      pipe.expire(`${monthKey}:completion`, 3024000)
+      pipe.expire(`${monthKey}:total`, 3024000)
+      await pipe.exec()
+      return
+    } catch (err) {
+      console.warn("[redis] Token tracking failed (non-blocking):", err)
+    }
+  }
+
+  // In-memory fallback — useful for dev but doesn't persist
+  const totalKey = `${dayKey}:total`
+  const existing = memoryStore.get(totalKey)
+  const prev = existing ? parseInt(existing.value, 10) : 0
+  memoryStore.set(totalKey, {
+    value: String(prev + tokens.totalTokens),
+    expires: Date.now() + 172800_000,
+  })
+}
+
+/**
+ * Get token usage for a user for a given period.
+ */
+export async function getTokenUsage(
+  userId: string,
+  period: "day" | "month",
+): Promise<TokenUsage> {
+  const now = new Date()
+  const periodKey =
+    period === "day"
+      ? `tokens:${userId}:${now.toISOString().slice(0, 10)}`
+      : `tokens:${userId}:${now.toISOString().slice(0, 7)}`
+
+  if (redis) {
+    try {
+      const [prompt, completion, total] = await Promise.all([
+        redis.get<number>(`${periodKey}:prompt`),
+        redis.get<number>(`${periodKey}:completion`),
+        redis.get<number>(`${periodKey}:total`),
+      ])
+      return {
+        promptTokens: prompt ?? 0,
+        completionTokens: completion ?? 0,
+        totalTokens: total ?? 0,
+      }
+    } catch {
+      // Fall through to default
+    }
+  }
+
+  return { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+}
