@@ -33,12 +33,6 @@ export class AuthenticationError extends AppError {
   }
 }
 
-export class ForbiddenError extends AppError {
-  constructor(message: string = "Access denied") {
-    super(message, "FORBIDDEN", 403)
-  }
-}
-
 export class NotFoundError extends AppError {
   constructor(resource: string) {
     super(`${resource} not found`, "NOT_FOUND", 404)
@@ -54,11 +48,5 @@ export class RateLimitError extends AppError {
 export class ExternalServiceError extends AppError {
   constructor(service: string, message: string) {
     super(`${service}: ${message}`, "EXTERNAL_SERVICE_ERROR", 502)
-  }
-}
-
-export class TimeoutError extends AppError {
-  constructor(operation: string) {
-    super(`${operation} timed out`, "TIMEOUT", 504)
   }
 }

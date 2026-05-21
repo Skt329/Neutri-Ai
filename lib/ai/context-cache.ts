@@ -10,7 +10,7 @@
  */
 
 import { redisGet, redisSet, redisDel } from "@/lib/redis"
-import type { NutritionTargets, Profile, StreakInfo } from "@/lib/types"
+import type { DailyTotals, NutritionTargets, Profile, StreakInfo } from "@/lib/types"
 
 // ── Cache key helpers ─────────────────────────────────────────────────
 
@@ -31,13 +31,6 @@ const TTL = {
 } as const
 
 // ── Types ─────────────────────────────────────────────────────────────
-
-export interface DailyTotals {
-  calories: number
-  protein_g: number
-  carbs_g: number
-  fat_g: number
-}
 
 export interface CachedContext {
   profile: Profile | null

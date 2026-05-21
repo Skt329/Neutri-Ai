@@ -183,7 +183,7 @@ export async function clearMCPCache(tokenHash?: string): Promise<void> {
     if (typeof window === "undefined") {
       const { redis } = await import("@/lib/redis")
       if (redis) {
-        redis.del(cacheKey).catch(() => {})
+        redis.del(cacheKey).catch((err: unknown) => console.warn("[swiggy-mcp] Cache clear failed:", err))
       }
     }
   }

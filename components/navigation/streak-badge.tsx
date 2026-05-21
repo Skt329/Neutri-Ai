@@ -19,7 +19,7 @@ export function StreakBadge() {
     fetch('/api/streak')
       .then((r) => r.json())
       .then((d) => setStreak(d.streak ?? 0))
-      .catch(() => {})
+      .catch((err) => console.warn("[streak-badge] Fetch failed:", err))
 
     // Allow a re-fetch after the dedup window (e.g. if the user
     // keeps the app open for a long session)

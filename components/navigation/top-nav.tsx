@@ -49,6 +49,7 @@ export function TopNav({ userName }: TopNavProps) {
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium smooth-hover',
                 active

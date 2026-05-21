@@ -34,7 +34,7 @@
   /* ── Text Colors ── */
   --ink: #16130F;
   --stone: #776F63;
-  --fog: #B0A898;
+  --fog: #807668;
   --ghost: #DDD6CA;
 
   /* ── Semantic Tokens (mapped for shadcn) ── */
@@ -87,6 +87,15 @@
   /* ── Shadows ── */
   --sh: 0 2px 16px rgba(0,0,0,0.08);
   --sh2: 0 4px 24px rgba(0,0,0,0.12);
+
+  /* ── Spacing Scale ── */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
 }
 
 /* ── Dark Mode ── */
@@ -113,7 +122,7 @@
   /* ── Text Colors ── */
   --ink: #EDEBE8;
   --stone: #9A9389;
-  --fog: #666058;
+  --fog: #9A9488;
   --ghost: #3A3630;
 
   /* ── Semantic Tokens ── */

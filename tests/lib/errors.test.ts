@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
-  AppError, ValidationError, AuthenticationError, ForbiddenError,
-  NotFoundError, RateLimitError, ExternalServiceError, TimeoutError,
+  AppError, ValidationError, AuthenticationError,
+  NotFoundError, RateLimitError, ExternalServiceError,
 } from "@/lib/errors"
 
 describe("AppError", () => {
@@ -47,13 +47,7 @@ describe("AuthenticationError", () => {
   })
 })
 
-describe("ForbiddenError", () => {
-  it("has correct defaults", () => {
-    const err = new ForbiddenError()
-    expect(err.message).toBe("Access denied")
-    expect(err.statusCode).toBe(403)
-  })
-})
+
 
 describe("NotFoundError", () => {
   it("includes resource in message", () => {
@@ -80,11 +74,3 @@ describe("ExternalServiceError", () => {
   })
 })
 
-describe("TimeoutError", () => {
-  it("includes operation in message", () => {
-    const err = new TimeoutError("MCP discovery")
-    expect(err.message).toBe("MCP discovery timed out")
-    expect(err.statusCode).toBe(504)
-    expect(err.code).toBe("TIMEOUT")
-  })
-})

@@ -3,7 +3,7 @@
  * streak, and memories with Redis cache-first strategy.
  */
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { NutritionTargets, Profile } from "@/lib/types"
+import type { DailyTotals, NutritionTargets, Profile } from "@/lib/types"
 import { sumTotals } from "@/lib/nutrition"
 import { computeStreakInfo } from "@/lib/streaks"
 import { computeMealGap, type MealGap } from "@/lib/meal-gaps"
@@ -18,7 +18,7 @@ import {
 export interface ChatContext {
   profile: Profile | null
   targets: NutritionTargets | null
-  totals: { calories: number; protein_g: number; carbs_g: number; fat_g: number }
+  totals: DailyTotals
   streak: ReturnType<typeof computeStreakInfo>
   gap: MealGap | null
   memories: Array<{ content: string }>
@@ -91,11 +91,12 @@ export async function loadChatContext(
   const targets = (targetsResult as { data: NutritionTargets | null })?.data ?? null
 
   // Compute totals
-  let totals: { calories: number; protein_g: number; carbs_g: number; fat_g: number }
+  let totals: DailyTotals
   if (!needTotals && cachedTotals) {
     totals = cachedTotals
   } else {
-    const todayMeals = (todayMealsResult as { data: any[] | null })?.data ?? []
+    const mealRows = todayMealsResult as { data: Array<{ logged_at: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null; fiber_g: number | null }> | null } | null
+    const todayMeals = mealRows?.data ?? []
     totals = sumTotals(todayMeals)
   }
 
@@ -104,9 +105,10 @@ export async function loadChatContext(
   if (!needStreak && cachedStreak) {
     streak = cachedStreak
   } else {
-    const streakMeals = (streakMealsResult as { data: any[] | null })?.data ?? []
+    const streakRows = streakMealsResult as { data: Array<{ logged_at: string }> | null } | null
+    const streakMeals = streakRows?.data ?? []
     streak = computeStreakInfo(
-      streakMeals.map((m: any) => m.logged_at),
+      streakMeals.map((m) => m.logged_at),
       profile?.timezone || "UTC",
     )
   }
@@ -116,9 +118,10 @@ export async function loadChatContext(
   if (!needTotals && cachedTotals) {
     gap = null // No individual timestamps in cache
   } else {
-    const todayMeals = (todayMealsResult as { data: any[] | null })?.data ?? []
+    const mealRowsForGap = todayMealsResult as { data: Array<{ logged_at: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null; fiber_g: number | null }> | null } | null
+    const todayMealsForGap = mealRowsForGap?.data ?? []
     gap = computeMealGap(
-      todayMeals.map((m: any) => ({
+      todayMealsForGap.map((m) => ({
         id: "", user_id: userId, logged_at: m.logged_at,
         meal_type: null, description: "",
         calories: m.calories ?? 0, protein_g: m.protein_g ?? 0,
@@ -155,7 +158,9 @@ export async function loadChatContext(
   if (needStreak) cacheOps.push(cacheStreak(userId, streak))
   if (needMemories) cacheOps.push(cacheMemories(userId, memories))
   if (cacheOps.length > 0) {
-    Promise.all(cacheOps).catch(() => {})
+    Promise.all(cacheOps).catch((err) =>
+      console.warn("[chat-context] Cache write failed (non-blocking):", err),
+    )
   }
 
   return { profile, targets, totals, streak, gap, memories, cacheHits }

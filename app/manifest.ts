@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: '/neutri-ai',
     name: 'NeutriAI — Your AI Dietitian',
     short_name: 'NeutriAI',
     description:
@@ -28,6 +29,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
+      },
+    ],
+    screenshots: [
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        form_factor: 'wide',
       },
     ],
   }

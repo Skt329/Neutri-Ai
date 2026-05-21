@@ -6,16 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UIMessage } from "ai"
 import { generateText } from "ai"
 import { azureChatModel } from "@/lib/ai/azure-provider"
+import { messageToText } from "@/lib/ai/utils"
 import type { Logger } from "@/lib/logger"
 
-function messageToText(m: UIMessage): string {
-  if (!m.parts || !Array.isArray(m.parts)) return ""
-  return m.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join("\n")
-    .trim()
-}
+
 
 /**
  * Generate a short title for a conversation based on the first exchange.
@@ -120,7 +114,9 @@ export async function persistMessages(opts: {
         if (title) {
           supabase.from("conversations").update({ title }).eq("id", conversationId).then(() => {})
         }
-      }).catch(() => {})
+      }).catch((err) => {
+        console.warn("[chat-persistence] Title generation failed (non-blocking):", err)
+      })
     }
   }
 }

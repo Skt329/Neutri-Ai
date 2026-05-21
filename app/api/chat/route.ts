@@ -13,21 +13,14 @@ import { truncateMessages } from "@/lib/ai/context-manager"
 import { createRequestLogger } from "@/lib/logger"
 import { loadChatContext } from "@/lib/ai/chat-context"
 import { persistMessages } from "@/lib/ai/chat-persistence"
+import { messageToText } from "@/lib/ai/utils"
 import { invalidateMealCache, invalidateProfileCache, invalidateTargetsCache } from "@/lib/ai/context-cache"
+import type { ToolSet } from "ai"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function messageToText(m: UIMessage): string {
-  if (!m.parts || !Array.isArray(m.parts)) return ""
-  return m.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join("\n")
-    .trim()
-}
 
 async function authenticateUser(supabase: Awaited<ReturnType<typeof createClient>>, log: ReturnType<typeof createRequestLogger>) {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -52,7 +45,7 @@ async function loadSwiggyTools(
   userId: string,
   log: ReturnType<typeof createRequestLogger>,
 ) {
-  let swiggyTools: Record<string, any> = {}
+  let swiggyTools: ToolSet = {}
   let swiggyConnected = false
   let swiggyExpiringSoon = false
   let swiggyCleanup: (() => Promise<void>) | null = null
@@ -195,19 +188,25 @@ export async function POST(req: Request) {
     onStepFinish: ({ toolCalls, toolResults, text }) => {
       log.debug("chat", "step finished", {
         textLength: text?.length ?? 0,
-        toolCalls: toolCalls?.map((tc: any) => ({ name: tc.toolName, id: tc.toolCallId })),
-        toolResults: toolResults?.map((tr: any) => ({ name: tr.toolName, id: tr.toolCallId, hasResult: !!tr.result })),
+        toolCalls: toolCalls?.map((tc) => ({ name: tc?.toolName, id: tc?.toolCallId })),
+        toolResults: toolResults?.map((tr) => ({ name: tr?.toolName, id: tr?.toolCallId, hasResult: tr && 'result' in tr ? !!tr.result : false })),
       })
 
       if (toolCalls) {
         for (const tc of toolCalls) {
           if (!tc) continue
           if (tc.toolName === "log_meal" || tc.toolName === "delete_meal") {
-            invalidateMealCache(user.id).catch(() => {})
+            invalidateMealCache(user.id).catch((err) =>
+              log.warn("chat", "Failed to invalidate meal cache", { error: err instanceof Error ? err.message : String(err) }),
+            )
           } else if (tc.toolName === "update_profile") {
-            invalidateProfileCache(user.id).catch(() => {})
+            invalidateProfileCache(user.id).catch((err) =>
+              log.warn("chat", "Failed to invalidate profile cache", { error: err instanceof Error ? err.message : String(err) }),
+            )
           } else if (tc.toolName === "set_targets") {
-            invalidateTargetsCache(user.id).catch(() => {})
+            invalidateTargetsCache(user.id).catch((err) =>
+              log.warn("chat", "Failed to invalidate targets cache", { error: err instanceof Error ? err.message : String(err) }),
+            )
           }
         }
       }
@@ -225,9 +224,13 @@ export async function POST(req: Request) {
               promptTokens: usage.inputTokens ?? 0,
               completionTokens: usage.outputTokens ?? 0,
               totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
-            }).catch(() => {})
+            }).catch((err) =>
+              log.warn("chat", "Token tracking failed (non-blocking)", { error: err instanceof Error ? err.message : String(err) }),
+            )
           }
-        }).catch(() => {})
+        }).catch((err) =>
+          log.warn("chat", "Failed to resolve token usage", { error: err instanceof Error ? err.message : String(err) }),
+        )
 
         // Persist messages
         await persistMessages({
@@ -238,7 +241,9 @@ export async function POST(req: Request) {
         log.error("chat", "Failed to persist messages", { error: e instanceof Error ? e.message : String(e) })
       } finally {
         if (swiggyCleanup) {
-          swiggyCleanup().catch(() => {})
+          swiggyCleanup().catch((err) =>
+            log.warn("chat", "Swiggy MCP cleanup failed", { error: err instanceof Error ? err.message : String(err) }),
+          )
         }
       }
     },

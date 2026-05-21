@@ -150,7 +150,9 @@ export async function lookupNutrition(
     const result = await getProductByBarcode(barcode)
     if (result) {
       const results = [result]
-      writeCache(barcodeKey, barcode, "openfoodfacts", results).catch(() => {})
+      writeCache(barcodeKey, barcode, "openfoodfacts", results).catch((err) =>
+        console.warn("[nutrition-lookup] Barcode cache write failed (non-blocking):", err),
+      )
       return results
     }
     // Fall through to text search if barcode not found
@@ -171,7 +173,9 @@ export async function lookupNutrition(
     try {
       const usdaResults = await searchUSDA({ query, pageSize: 5 })
       if (usdaResults.length > 0) {
-        writeCache(cacheKey, query, "usda", usdaResults).catch(() => {})
+        writeCache(cacheKey, query, "usda", usdaResults).catch((err) =>
+          console.warn("[nutrition-lookup] USDA cache write failed (non-blocking):", err),
+        )
         return usdaResults
       }
     } catch (err) {
@@ -183,7 +187,9 @@ export async function lookupNutrition(
   try {
     const offResults = await searchOpenFoodFacts(query, 5)
     if (offResults.length > 0) {
-      writeCache(cacheKey, query, "openfoodfacts", offResults).catch(() => {})
+      writeCache(cacheKey, query, "openfoodfacts", offResults).catch((err) =>
+        console.warn("[nutrition-lookup] OFF cache write failed (non-blocking):", err),
+      )
       return offResults
     }
   } catch (err) {
