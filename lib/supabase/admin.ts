@@ -5,8 +5,16 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
  * (embedding writes, memory extraction, webhooks). Never import this
  * into a component or route that is reachable by the user without
  * first re-authorizing on user_id.
+ *
+ * Uses a lazy singleton — the client is created once on first call
+ * and reused for subsequent calls within the same process lifetime.
  */
+
+let _adminClient: ReturnType<typeof createSupabaseClient> | null = null
+
 export function createAdminClient() {
+  if (_adminClient) return _adminClient
+
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -16,7 +24,9 @@ export function createAdminClient() {
     )
   }
 
-  return createSupabaseClient(url, key, {
+  _adminClient = createSupabaseClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  return _adminClient
 }

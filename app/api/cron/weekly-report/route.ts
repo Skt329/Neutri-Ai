@@ -21,7 +21,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const admin = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tables not in generated types
+  const admin = createAdminClient() as any
   const weekEnd = new Date()
   const weekStart = new Date(weekEnd.getTime() - 7 * 24 * 60 * 60 * 1000)
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
   }
 
   // Deduplicate user IDs
-  const userIds = [...new Set((activeUsers ?? []).map((r) => r.user_id))]
+  const userIds = [...new Set((activeUsers ?? []).map((r: { user_id: string }) => r.user_id))]
   logger.info("weekly-report", `Found ${userIds.length} active users`)
 
   let successCount = 0
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
             .order("logged_at", { ascending: false })
 
           const daysWithMeals = new Set(
-            (streakMeals ?? []).map((m) => m.logged_at.slice(0, 10)),
+            (streakMeals ?? []).map((m: { logged_at: string }) => m.logged_at.slice(0, 10)),
           )
           let streakDays = 0
           const today = new Date()

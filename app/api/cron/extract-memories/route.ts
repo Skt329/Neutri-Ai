@@ -47,13 +47,33 @@ const MemoryExtractionSchema = z.object({
  * Auth: Bearer token matching CRON_SECRET env var.
  */
 export async function POST(req: Request) {
-  // Verify cron secret
+  // ── Auth: layered verification ──────────────────────────────────────────
+  // 1. Vercel Cron signature (automatic when using vercel.json cron config)
+  // 2. Bearer token matching CRON_SECRET
+  // At least one must pass.
+
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1"
   const auth = req.headers.get("authorization")
-  if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
+  const hasBearerToken = CRON_SECRET && auth === `Bearer ${CRON_SECRET}`
+
+  if (!isVercelCron && !hasBearerToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const admin = createAdminClient()
+  // Timestamp validation — reject requests older than 5 minutes
+  // (prevents replay attacks with a leaked CRON_SECRET)
+  const timestampHeader = req.headers.get("x-cron-timestamp")
+  if (timestampHeader) {
+    const requestTime = parseInt(timestampHeader, 10)
+    const now = Date.now()
+    const MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
+    if (isNaN(requestTime) || Math.abs(now - requestTime) > MAX_AGE_MS) {
+      return NextResponse.json({ error: "Request expired" }, { status: 401 })
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom RPCs not in generated types
+  const admin = createAdminClient() as any
 
   try {
     // 1. Find conversations needing extraction
@@ -107,7 +127,8 @@ export async function POST(req: Request) {
  * Returns the number of new memories stored.
  */
 async function processConversation(
-  admin: ReturnType<typeof createAdminClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom RPCs not in generated types
+  admin: any,
   conversationId: string,
   userId: string,
 ): Promise<number> {

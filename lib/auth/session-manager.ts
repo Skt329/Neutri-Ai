@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 
 const SESSION_CACHE_KEY = 'nutriai_session_cache'
 const SESSION_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const AUTH_SYNC_CHANNEL = 'nutriai-auth-sync'
 
 interface CachedSession {
   user: User | null
@@ -24,6 +25,36 @@ interface LocalStorageAuthHint {
 class SessionManager {
   private cachedSession: CachedSession | null = null
   private sessionPromise: Promise<CachedSession> | null = null
+  private broadcastChannel: BroadcastChannel | null = null
+
+  constructor() {
+    this.initBroadcastChannel()
+  }
+
+  /**
+   * Set up cross-tab session synchronization via BroadcastChannel.
+   * When any tab calls invalidateCache(), all other tabs immediately
+   * clear their in-memory and localStorage caches.
+   */
+  private initBroadcastChannel() {
+    try {
+      if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return
+      this.broadcastChannel = new BroadcastChannel(AUTH_SYNC_CHANNEL)
+      this.broadcastChannel.addEventListener('message', (event) => {
+        if (event.data === 'logout' || event.data === 'invalidate') {
+          // Another tab triggered logout — clear local caches silently
+          this.cachedSession = null
+          try {
+            localStorage.removeItem(SESSION_CACHE_KEY)
+          } catch {
+            // Silently fail if localStorage is unavailable
+          }
+        }
+      })
+    } catch {
+      // BroadcastChannel not supported — cross-tab sync disabled gracefully
+    }
+  }
 
   /**
    * Get current session with intelligent caching
@@ -124,7 +155,8 @@ class SessionManager {
   }
 
   /**
-   * Invalidate session cache when user logs out or session changes
+   * Invalidate session cache when user logs out or session changes.
+   * Broadcasts to all other open tabs so they clear their caches too.
    */
   invalidateCache() {
     this.cachedSession = null
@@ -134,6 +166,13 @@ class SessionManager {
       }
     } catch {
       // Silently fail
+    }
+
+    // Notify all other tabs to invalidate their caches
+    try {
+      this.broadcastChannel?.postMessage('logout')
+    } catch {
+      // BroadcastChannel may be closed — ignore
     }
   }
 

@@ -25,7 +25,8 @@ export async function retrieveMemories(params: {
     // Embed as "query" (for retrieval). NeMo Retriever is asymmetric.
     const embedding = await nimEmbed(query, "query")
 
-    const admin = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom RPCs not in generated types
+    const admin = createAdminClient() as any
 
     const { data, error } = await admin.rpc("match_memories_for_user", {
       p_user_id: params.userId,

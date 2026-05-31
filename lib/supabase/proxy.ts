@@ -6,17 +6,49 @@ const AUTH_ONLY_PATHS = ["/auth/login", "/auth/sign-up"]
 
 // Origins allowed to make cross-origin requests to the API.
 const ALLOWED_ORIGINS = [
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-].filter(Boolean)
+  process.env.NEXT_PUBLIC_APP_URL,
+  // Always allow localhost in development
+  process.env.NODE_ENV === "development" ? "http://localhost:3000" : undefined,
+].filter(Boolean) as string[]
 
 // ── Security helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Content Security Policy — allowlists all known first-party and
+ * third-party origins used by the app.
+ *
+ * `'unsafe-inline'` is required for Next.js style injection and
+ * `'unsafe-eval'` for dev hot-reload (stripped in production ideally,
+ * but Next.js SSR still needs it for some dynamic rendering).
+ */
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  // Scripts: self + Vercel Analytics + Sentry
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://*.sentry.io",
+  // Styles: self + Google Fonts (inline needed for Next.js)
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Fonts: self + Google Fonts static
+  "font-src 'self' https://fonts.gstatic.com",
+  // Images: self + data URIs + Supabase storage + OpenFoodFacts + Cloudinary
+  "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://world.openfoodfacts.org https://res.cloudinary.com",
+  // API connections: self + all backend services
+  "connect-src 'self' https://*.supabase.co https://*.upstash.io https://*.openai.azure.com https://integrate.api.nvidia.com https://*.sentry.io https://va.vercel-scripts.com",
+  // Workers: self (for service worker / Serwist)
+  "worker-src 'self' blob:",
+  // No iframes
+  "frame-ancestors 'none'",
+  // Forms only submit to self
+  "form-action 'self'",
+  // Base URI restricted to self
+  "base-uri 'self'",
+].join("; ")
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("X-Content-Type-Options", "nosniff")
   response.headers.set("X-Frame-Options", "DENY")
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set("X-XSS-Protection", "1; mode=block")
   response.headers.set("Permissions-Policy", "camera=(self), microphone=()")
+  response.headers.set("Content-Security-Policy", CSP_DIRECTIVES)
   return response
 }
 
@@ -67,34 +99,17 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // For server action requests (POST with `next-action` header), do a full
-  // getUser() so the session tokens are refreshed BEFORE the action handler
-  // runs. This prevents the action's own getUser() from having to do both
-  // token refresh + validation — which doubles the timeout window.
-  const isServerAction = request.headers.get("next-action") !== null
-
-  if (isServerAction) {
-    try {
-      await supabase.auth.getUser()
-    } catch {
-      // Non-fatal — the action handler has its own retry logic.
-      // This is purely a best-effort session refresh.
-    }
-  }
-
-  // Use getSession() instead of getUser() for route guard checks.
-  // getSession() reads from the JWT cookie locally (no Supabase network call),
-  // saving ~100-150ms per navigation. The authoritative getUser() verification
-  // still happens in the RSC layout and API routes — the middleware only needs
-  // to know "is there a valid session cookie?" for redirect logic.
+  // Use getUser() for all route guard checks — this verifies the JWT
+  // with Supabase's auth server rather than trusting the local cookie.
+  // Slightly slower (~100ms) but prevents tampered-JWT bypass.
   let user = null
   try {
-    const { data } = await supabase.auth.getSession()
-    user = data.session?.user ?? null
+    const { data } = await supabase.auth.getUser()
+    user = data.user ?? null
   } catch (err) {
     // Supabase auth can timeout on slow connections — don't crash the proxy.
     // Protected-route redirect will still fire (user stays null).
-    console.warn("[proxy] auth.getSession() failed:", err instanceof Error ? err.message : err)
+    console.warn("[proxy] auth.getUser() failed:", err instanceof Error ? err.message : err)
   }
 
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))

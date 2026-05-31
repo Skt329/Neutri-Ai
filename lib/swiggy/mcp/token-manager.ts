@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { randomBytes, createCipheriv, createDecipheriv } from "crypto"
+import { logger } from "@/lib/logger"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -168,7 +169,7 @@ export async function getValidToken(
   try {
     return decrypt(data.access_token_enc)
   } catch (err) {
-    console.error("[Swiggy Token Manager] Failed to decrypt Swiggy access token:", err)
+    logger.warn("swiggy.token", "Failed to decrypt Swiggy access token")
     return null
   }
 }
