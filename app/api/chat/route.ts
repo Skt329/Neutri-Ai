@@ -2,7 +2,8 @@ import { convertToModelMessages, hasToolCall, stepCountIs, streamText, type UIMe
 import { azureChatModel } from "@/lib/ai/azure-provider"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildTools, buildSwiggySmartTools, CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
+import { buildTools, buildSwiggySmartTools } from "@/lib/ai/tools"
+import { CLIENT_TOOL_NAMES } from "@/lib/ai/tools/client-tool-names"
 import { buildSystemPrompt } from "@/lib/ai/system-prompt"
 import { getValidToken, getSwiggyConnectionStatus } from "@/lib/swiggy/mcp/token-manager"
 import { getSwiggyMCPTools } from "@/lib/swiggy/mcp/client"
@@ -22,7 +23,11 @@ export const maxDuration = 60
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function authenticateUser(supabase: Awaited<ReturnType<typeof createClient>>, log: ReturnType<typeof createRequestLogger>) {
+/** Authenticate with a fast retry (300ms instead of 1s). */
+async function authenticateUser(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  log: ReturnType<typeof createRequestLogger>,
+) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { data } = await supabase.auth.getUser()
@@ -32,7 +37,7 @@ async function authenticateUser(supabase: Awaited<ReturnType<typeof createClient
         error: err instanceof Error ? err.message : String(err),
       })
       if (attempt === 1) return null
-      await new Promise((r) => setTimeout(r, 1000))
+      await new Promise((r) => setTimeout(r, 300))
     }
   }
   return null
@@ -40,6 +45,7 @@ async function authenticateUser(supabase: Awaited<ReturnType<typeof createClient
 
 // ── Swiggy MCP setup ─────────────────────────────────────────────────────────
 
+/** Load Swiggy tools with a tight 3s timeout to avoid blocking the request. */
 async function loadSwiggyTools(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -54,14 +60,17 @@ async function loadSwiggyTools(
     const swiggyToken = await getValidToken(supabase, userId)
     if (swiggyToken) {
       swiggyConnected = true
-      const swiggyStatus = await getSwiggyConnectionStatus(supabase, userId)
-      swiggyExpiringSoon = swiggyStatus.expiringSoon
-      const mcpResult = await Promise.race([
-        getSwiggyMCPTools(swiggyToken),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("MCP discovery timeout (8s)")), 8000),
-        ),
+      // Run status + MCP discovery in parallel
+      const [swiggyStatus, mcpResult] = await Promise.all([
+        getSwiggyConnectionStatus(supabase, userId),
+        Promise.race([
+          getSwiggyMCPTools(swiggyToken),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("MCP discovery timeout (3s)")), 3000),
+          ),
+        ]),
       ])
+      swiggyExpiringSoon = swiggyStatus.expiringSoon
       swiggyTools = mcpResult.tools
       swiggyCleanup = mcpResult.cleanup
       log.info("chat", `Swiggy MCP: ${Object.keys(mcpResult.tools).length} tools loaded`)
@@ -85,43 +94,55 @@ export async function POST(req: Request) {
   const log = createRequestLogger(requestId)
   const supabase = await createClient()
 
-  // ── Auth ──
-  const user = await authenticateUser(supabase, log)
-  if (!user) return apiError("Unauthorized", "UNAUTHORIZED", 401)
+  // ╔════════════════════════════════════════════════════════════════════════╗
+  // ║ PHASE 1: Auth + Body parse run in parallel (independent of each other)║
+  // ╚════════════════════════════════════════════════════════════════════════╝
+  const [user, parsed] = await Promise.all([
+    authenticateUser(supabase, log),
+    parseBody(req, ChatRequestSchema),
+  ])
 
-  // ── Rate limit ──
-  const ratelimit = await limitChat(user.id)
+  if (!user) return apiError("Unauthorized", "UNAUTHORIZED", 401)
+  if (parsed instanceof NextResponse) return parsed
+  const { messages, conversationId } = parsed as { messages: UIMessage[]; conversationId: string }
+
+  // Extract user text early (needed by context loader, costs nothing)
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
+  const lastUserText = lastUserMessage ? messageToText(lastUserMessage) : ""
+
+  // ╔════════════════════════════════════════════════════════════════════════╗
+  // ║ PHASE 2: All independent DB/cache lookups run in parallel             ║
+  // ║  - Rate limiting                                                      ║
+  // ║  - Conversation ownership check                                       ║
+  // ║  - Chat context (profile, targets, totals, streak, memories)          ║
+  // ║  - Swiggy MCP discovery                                               ║
+  // ╚════════════════════════════════════════════════════════════════════════╝
+  const [ratelimit, convoResult, ctx, swiggyResult] = await Promise.all([
+    limitChat(user.id),
+    supabase
+      .from("conversations")
+      .select("id, title")
+      .eq("id", conversationId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    loadChatContext(supabase, user.id, lastUserText),
+    loadSwiggyTools(supabase, user.id, log),
+  ])
+
+  // ── Validate phase 2 results ──
   if (!ratelimit.success) {
     return apiError("Too many requests. Please wait a moment.", "RATE_LIMITED", 429)
   }
 
-  // ── Validate request body ──
-  const parsed = await parseBody(req, ChatRequestSchema)
-  if (parsed instanceof NextResponse) return parsed
-  const { messages, conversationId } = parsed as { messages: UIMessage[]; conversationId: string }
-
-  // ── Verify conversation ownership ──
-  const { data: convo, error: convErr } = await supabase
-    .from("conversations")
-    .select("id, title")
-    .eq("id", conversationId)
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const { data: convo, error: convErr } = convoResult
   if (convErr || !convo) return apiError("Conversation not found", "NOT_FOUND", 404)
   const existingTitle = convo.title as string | null
-
-  // ── Load context ──
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")
-  const lastUserText = lastUserMessage ? messageToText(lastUserMessage) : ""
-  const ctx = await loadChatContext(supabase, user.id, lastUserText)
 
   if (ctx.cacheHits > 0) {
     log.debug("chat", `Context cache: ${ctx.cacheHits}/5 hits`)
   }
 
-  // ── Swiggy MCP ──
-  const { swiggyTools, swiggyConnected, swiggyExpiringSoon, swiggyCleanup } =
-    await loadSwiggyTools(supabase, user.id, log)
+  const { swiggyTools, swiggyConnected, swiggyExpiringSoon, swiggyCleanup } = swiggyResult
 
   // ── Build system prompt ──
   const system = buildSystemPrompt({
@@ -172,7 +193,7 @@ export async function POST(req: Request) {
   // ── Stream ──
   const result = streamText({
     model: azureChatModel,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 2048,
     system,
     messages: await convertToModelMessages(truncateMessages(messages)),
     tools,

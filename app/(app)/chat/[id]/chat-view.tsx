@@ -5,8 +5,13 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import ReactMarkdown from "react-markdown"
+import dynamic from "next/dynamic"
 import remarkGfm from "remark-gfm"
+
+const ReactMarkdown = dynamic(() => import("react-markdown"), {
+  ssr: false,
+  loading: () => <span className="animate-pulse text-stone">…</span>,
+})
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -105,11 +110,12 @@ export function ChatView({
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: () => {
-      router.refresh()
       if (!hadTitleRef.current) {
         hadTitleRef.current = true
-        // Delayed refresh to catch the async fire-and-forget title generation
-        setTimeout(() => router.refresh(), 3000)
+        // Single delayed refresh to catch async title generation
+        setTimeout(() => router.refresh(), 2000)
+      } else {
+        router.refresh()
       }
     },
     onError: (err) => {

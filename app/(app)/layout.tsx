@@ -4,11 +4,9 @@ import { getProfile } from "@/lib/supabase/profile"
 import { NutriShell } from "@/components/layouts/nutri-shell"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await getAuthUser()
+  const [{ user }, profile] = await Promise.all([getAuthUser(), getProfile()])
 
   if (!user) redirect("/auth/login")
-
-  const profile = await getProfile()
 
   if (!profile?.onboarding_completed) {
     redirect("/onboarding")

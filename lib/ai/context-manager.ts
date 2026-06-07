@@ -6,10 +6,10 @@ import type { UIMessage } from "ai"
  * GPT-4.1 mini context: 128K. We reserve:
  *   - ~10K for system prompt
  *   - ~5K for tool schemas
- *   - ~4K for output
- *   - Remaining: ~109K, but we cap at 16K for cost control.
+ *   - ~2K for output
+ *   - Remaining: ~111K, but we cap at 10K for latency and cost control.
  */
-const MAX_CONTEXT_TOKENS = 16_000
+const MAX_CONTEXT_TOKENS = 10_000
 
 /** Rough token estimation: 1 token ≈ 4 characters for English text */
 function estimateTokens(text: string): number {

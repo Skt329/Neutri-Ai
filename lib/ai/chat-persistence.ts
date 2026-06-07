@@ -61,6 +61,9 @@ export async function persistMessages(opts: {
   const maxOrdinal = ordinalRow?.[0]?.ordinal ?? -1
   const newMessages = finishedMessages.slice(savedCount)
 
+  // Build independent DB ops and run them in parallel
+  const ops: PromiseLike<any>[] = []
+
   if (newMessages.length > 0) {
     const rows = newMessages.map((m, i) => ({
       conversation_id: conversationId,
@@ -69,10 +72,11 @@ export async function persistMessages(opts: {
       parts: m.parts as unknown,
       ordinal: maxOrdinal + 1 + i,
     }))
-    const { error: insertErr } = await supabase.from("messages").insert(rows)
-    if (insertErr) {
-      log.error("chat", "Failed to insert new messages", { error: insertErr.message })
-    }
+    ops.push(
+      supabase.from("messages").insert(rows).then(({ error: insertErr }) => {
+        if (insertErr) log.error("chat", "Failed to insert new messages", { error: insertErr.message })
+      })
+    )
   }
 
   // Update last pre-existing message if its parts have grown
@@ -82,22 +86,29 @@ export async function persistMessages(opts: {
       (p) => p.type === "tool-invocation" || (p.type.startsWith("tool-") && p.type !== "tool-invocation"),
     )
     if (hasToolParts) {
-      const { error: updateErr } = await supabase
-        .from("messages")
-        .update({ parts: lastPreExisting.parts as unknown })
-        .eq("conversation_id", conversationId)
-        .eq("ordinal", maxOrdinal)
-      if (updateErr) {
-        log.error("chat", "Failed to update existing message parts", { error: updateErr.message })
-      }
+      ops.push(
+        supabase
+          .from("messages")
+          .update({ parts: lastPreExisting.parts as unknown })
+          .eq("conversation_id", conversationId)
+          .eq("ordinal", maxOrdinal)
+          .then(({ error: updateErr }) => {
+            if (updateErr) log.error("chat", "Failed to update existing message parts", { error: updateErr.message })
+          })
+      )
     }
   }
 
-  // Update conversation timestamp
-  await supabase
-    .from("conversations")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", conversationId)
+  // Conversation timestamp update
+  ops.push(
+    supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId)
+      .then(() => {})
+  )
+
+  await Promise.all(ops)
 
   // Fire-and-forget title generation
   if (!existingTitle) {

@@ -17,10 +17,8 @@ export const metadata = {
 }
 
 export default async function DashboardPage() {
-  const { user } = await getAuthUser()
+  const [{ user }, profile] = await Promise.all([getAuthUser(), getProfile()])
   if (!user) return null
-
-  const profile = await getProfile()
   const timezone = profile?.timezone || "UTC"
   const dayStart = startOfLocalDayISO(timezone)
 

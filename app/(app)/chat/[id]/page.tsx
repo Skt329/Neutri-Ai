@@ -13,7 +13,7 @@ import type { UIMessage } from "ai"
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { user, supabase } = await getAuthUser()
+  const [{ user, supabase }, profile] = await Promise.all([getAuthUser(), getProfile()])
   if (!user) return null
 
   // ── Lazy creation: "/chat/new" renders a lightweight input-only view ──
@@ -25,7 +25,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   // Fetch conversation + messages (unique to this page) alongside
   // cached loaders that are already deduped with the layout render.
-  const profile = await getProfile()
   const timezone = profile?.timezone || "UTC"
   const dayStart = startOfLocalDayISO(timezone)
 
