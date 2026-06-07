@@ -18,3 +18,5 @@ public/swe-worker-*.js
 
 /lib/generated/prisma
 .env
+.env.production
+.env.staging

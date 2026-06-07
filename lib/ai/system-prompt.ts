@@ -264,6 +264,29 @@ You → analyze the image → extract items → call lookup_nutrition_batch → 
 Do NOT ask the user to list items manually.`
 
 // ════════════════════════════════════════════════════════════════════════
+// Sanitisation helpers
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sanitize user-supplied strings before embedding in system prompt.
+ * Strips patterns that could be used for prompt injection.
+ */
+function sanitizeForPrompt(value: string, maxLength = 200): string {
+  return value
+    .replace(/[\r\n]+/g, ' ')           // collapse newlines
+    .replace(/#{1,6}\s/g, '')            // strip markdown headings
+    .replace(/```[\s\S]*?```/g, '')      // strip code blocks
+    .replace(/\[(?:system|user|assistant)\]/gi, '')  // strip role markers
+    .replace(/(?:ignore|forget|disregard|override)\s+(?:previous|above|all)\s+(?:instructions?|rules?|prompts?)/gi, '[filtered]')  // common injection patterns
+    .trim()
+    .slice(0, maxLength)
+}
+
+function sanitizeArray(values: string[], maxLength = 100): string {
+  return values.map(v => sanitizeForPrompt(v, maxLength)).join(', ')
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // Builder Function
 // ════════════════════════════════════════════════════════════════════════
 
@@ -282,7 +305,7 @@ export function buildSystemPrompt(opts: {
 
   const profileBlock = profile
     ? [
-        `- Name: ${profile.full_name ?? "unknown"}`,
+        `- Name: ${sanitizeForPrompt(profile.full_name ?? "unknown", 50)}`,
         profile.age != null ? `- Age: ${profile.age}` : null,
         profile.sex ? `- Sex: ${profile.sex}` : null,
         profile.height_cm != null ? `- Height: ${profile.height_cm} cm` : null,
@@ -291,16 +314,16 @@ export function buildSystemPrompt(opts: {
         profile.goal ? `- Goal: ${profile.goal}` : null,
         profile.cooking_skill ? `- Cooking skill: ${profile.cooking_skill}` : null,
         profile.household_size != null ? `- Household size: ${profile.household_size}` : null,
-        profile.dietary_preferences.length ? `- Diet: ${profile.dietary_preferences.join(", ")}` : null,
-        profile.allergies.length ? `- Allergies: ${profile.allergies.join(", ")}` : null,
-        profile.health_conditions.length ? `- Health: ${profile.health_conditions.join(", ")}` : null,
-        profile.cuisines.length ? `- Preferred cuisines: ${profile.cuisines.join(", ")}` : null,
-        profile.kitchen_appliances.length ? `- Appliances: ${profile.kitchen_appliances.join(", ")}` : null,
+        profile.dietary_preferences.length ? `- Diet: ${sanitizeArray(profile.dietary_preferences)}` : null,
+        profile.allergies.length ? `- Allergies: ${sanitizeArray(profile.allergies)}` : null,
+        profile.health_conditions.length ? `- Health: ${sanitizeArray(profile.health_conditions)}` : null,
+        profile.cuisines.length ? `- Preferred cuisines: ${sanitizeArray(profile.cuisines)}` : null,
+        profile.kitchen_appliances.length ? `- Appliances: ${sanitizeArray(profile.kitchen_appliances)}` : null,
         profile.favorite_ingredients.length
-          ? `- Favorite ingredients: ${profile.favorite_ingredients.join(", ")}`
+          ? `- Favorite ingredients: ${sanitizeArray(profile.favorite_ingredients)}`
           : null,
         profile.disliked_ingredients.length
-          ? `- Disliked ingredients: ${profile.disliked_ingredients.join(", ")}`
+          ? `- Disliked ingredients: ${sanitizeArray(profile.disliked_ingredients)}`
           : null,
       ]
         .filter(Boolean)
@@ -316,7 +339,7 @@ export function buildSystemPrompt(opts: {
       ? `Calories ${Math.round(dailyTotals.calories)}/${targets.calories} · Protein ${Math.round(dailyTotals.protein_g)}/${targets.protein_g}g · Carbs ${Math.round(dailyTotals.carbs_g)}/${targets.carbs_g}g · Fat ${Math.round(dailyTotals.fat_g)}/${targets.fat_g}g`
       : "(No meals logged today)"
 
-  const memoryBlock = memories.length ? memories.map((m, i) => `  ${i + 1}. ${m.content}`).join("\n") : "  (none yet)"
+  const memoryBlock = memories.length ? memories.map((m, i) => `  ${i + 1}. ${sanitizeForPrompt(m.content, 300)}`).join("\n") : "  (none yet)"
 
   const swiggyLine = swiggyConnected
     ? "CONNECTED — Swiggy MCP tools (food_* for food ordering, im_* for Instamart groceries) + smart tools (smart_food_search, pantry_restock, nutrition_aware_checkout, healthy_reorder)"

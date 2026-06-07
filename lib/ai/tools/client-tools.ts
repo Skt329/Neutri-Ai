@@ -1,7 +1,7 @@
 import { tool } from "ai"
 import { z } from "zod"
 import { MEAL_TYPES, PANTRY_CATEGORIES } from "@/lib/categories"
-import { NUTRITION_BASIS, NutritionFields } from "./schemas"
+import { NutritionFields } from "./schemas"
 
 /**
  * Client tools — no `execute` function.

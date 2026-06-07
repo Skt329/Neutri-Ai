@@ -2,11 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function AuthErrorPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>
-}) {
+export default function AuthErrorPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md">

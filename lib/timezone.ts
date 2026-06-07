@@ -17,22 +17,8 @@ export function getDayStartISO(timezone?: string | null): string {
     })
     // en-CA gives us YYYY-MM-DD format
     const dateStr = formatter.format(new Date())
-    // Create midnight in UTC equivalent of the user's local midnight
-    const [year, month, day] = dateStr.split("-").map(Number)
-    // Use DateTimeFormat to find the offset at midnight
-    const midnightLocal = new Date(`${dateStr}T00:00:00`)
-    // Calculate offset using the timezone
-    const utcFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      hour: "numeric",
-      minute: "numeric",
-      hour12: false,
-      timeZoneName: "shortOffset",
-    })
-    const parts = utcFormatter.formatToParts(midnightLocal)
-    // Simpler approach: just use the date string as a timestamp filter
-    // Since PostgreSQL timestamptz stores in UTC, we need the UTC equivalent
-    // of "midnight in user's timezone"
+    // Use the date string directly as a timestamp filter
+    // PostgreSQL timestamptz comparison works with the local date string
     return `${dateStr}T00:00:00`
   } catch {
     // Invalid timezone — fall back to UTC midnight

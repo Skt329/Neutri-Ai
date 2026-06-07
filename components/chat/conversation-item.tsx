@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
@@ -24,7 +25,7 @@ interface ConversationItemProps {
   onDelete: (c: Conversation) => void
 }
 
-export function ConversationItem({ conversation: c, isActive, onRename, onDelete }: ConversationItemProps) {
+function ConversationItemInner({ conversation: c, isActive, onRename, onDelete }: ConversationItemProps) {
   return (
     <li>
       <ContextMenu>
@@ -85,3 +86,5 @@ export function ConversationItem({ conversation: c, isActive, onRename, onDelete
     </li>
   )
 }
+
+export const ConversationItem = memo(ConversationItemInner)

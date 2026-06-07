@@ -97,7 +97,7 @@ function CategorySection({
   )
 }
 
-function PantryRow({ item, index }: { item: PantryItem; index: number }) {
+function PantryRow({ item, index: _index }: { item: PantryItem; index: number }) {
   const [pending, startTransition] = useTransition()
   const [expanded, setExpanded] = useState(false)
 

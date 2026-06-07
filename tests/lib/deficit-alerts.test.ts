@@ -20,95 +20,179 @@ function makeTargets(overrides: Partial<NutritionTargets> = {}): NutritionTarget
 }
 
 describe("buildDeficitAlerts", () => {
-  it("returns empty array when no targets", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ calories: 100 })],
-      targets: null,
-      now: new Date(2026, 4, 21, 21, 0),
+  describe("no alerts scenarios", () => {
+    it("returns empty array when targets is null", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 100 })],
+        targets: null,
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      expect(alerts).toEqual([])
     })
-    expect(alerts).toEqual([])
+
+    it("returns no alerts before 5pm even with deficits", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ protein_g: 10, calories: 200, fiber_g: 2 })],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 15, 0),
+      })
+      expect(alerts).toEqual([])
+    })
+
+    it("returns no alerts when all targets are met at 9pm", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 1900, protein_g: 120, fiber_g: 30 })],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      expect(alerts).toHaveLength(0)
+    })
   })
 
-  it("returns no alerts before 5pm even with deficits", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ protein_g: 10, calories: 200, fiber_g: 2 })],
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 15, 0), // 3pm
+  describe("protein alerts", () => {
+    it("alerts with severity info when 20-49g protein missing at 5pm+", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ protein_g: 90 })], // 30g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 18, 0),
+      })
+      const a = alerts.find((a) => a.kind === "protein")
+      expect(a).toBeDefined()
+      expect(a!.severity).toBe("info")
+      expect(a!.title).toContain("30g protein")
     })
-    expect(alerts).toEqual([])
+
+    it("alerts with severity warning when >=50g protein missing", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ protein_g: 60 })], // 60g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 18, 0),
+      })
+      const a = alerts.find((a) => a.kind === "protein")
+      expect(a!.severity).toBe("warning")
+    })
+
+    it("does not alert protein when missing < 20g", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ protein_g: 105 })], // 15g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 18, 0),
+      })
+      expect(alerts.find((a) => a.kind === "protein")).toBeUndefined()
+    })
+
+    it("includes a quickFix suggestion", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ protein_g: 70 })], // 50g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 18, 0),
+      })
+      const a = alerts.find((a) => a.kind === "protein")
+      expect(a!.quickFix).toBeDefined()
+      expect(a!.quickFix!.length).toBeGreaterThan(0)
+    })
   })
 
-  it("alerts protein deficit at 6pm with severity info (20-49g missing)", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ protein_g: 90 })], // 30g missing from 120g target
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 18, 0), // 6pm
+  describe("fiber alerts", () => {
+    it("alerts fiber deficit after 6pm when >=10g missing", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ fiber_g: 10, protein_g: 120, calories: 2000 })], // 20g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 19, 0),
+      })
+      const a = alerts.find((a) => a.kind === "fiber")
+      expect(a).toBeDefined()
+      expect(a!.severity).toBe("info")
     })
-    const proteinAlert = alerts.find((a) => a.kind === "protein")
-    expect(proteinAlert).toBeDefined()
-    expect(proteinAlert!.severity).toBe("info")
-    expect(proteinAlert!.title).toContain("30g protein")
+
+    it("does not alert fiber when missing < 10g", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ fiber_g: 22, protein_g: 120, calories: 2000 })], // 8g missing
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 19, 0),
+      })
+      expect(alerts.find((a) => a.kind === "fiber")).toBeUndefined()
+    })
+
+    it("does not alert fiber before 6pm", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ fiber_g: 5, protein_g: 120, calories: 2000 })],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 17, 30),
+      })
+      expect(alerts.find((a) => a.kind === "fiber")).toBeUndefined()
+    })
   })
 
-  it("alerts protein deficit with severity warning (>=50g missing)", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ protein_g: 60 })], // 60g missing
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 18, 0),
+  describe("calorie alerts", () => {
+    it("alerts calorie undereating after 8pm when < 70%", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 1000, protein_g: 120, fiber_g: 30 })], // 50%
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      const a = alerts.find((a) => a.kind === "calories_low")
+      expect(a).toBeDefined()
+      expect(a!.message).toContain("1000")
     })
-    const proteinAlert = alerts.find((a) => a.kind === "protein")
-    expect(proteinAlert!.severity).toBe("warning")
+
+    it("alerts calorie overshoot after 8pm when > 115%", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 2500, protein_g: 120, fiber_g: 30 })], // 125%
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      const a = alerts.find((a) => a.kind === "calories_high")
+      expect(a).toBeDefined()
+      expect(a!.severity).toBe("warning")
+    })
+
+    it("does not alert calories between 70-115%", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 1800, protein_g: 120, fiber_g: 30 })], // 90%
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      expect(alerts.find((a) => a.kind === "calories_low")).toBeUndefined()
+      expect(alerts.find((a) => a.kind === "calories_high")).toBeUndefined()
+    })
+
+    it("does not alert calories before 8pm", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 500, protein_g: 120, fiber_g: 30 })],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 19, 30),
+      })
+      expect(alerts.find((a) => a.kind === "calories_low")).toBeUndefined()
+    })
   })
 
-  it("does not alert protein when missing < 20g", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ protein_g: 105 })], // 15g missing
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 18, 0),
+  describe("multiple simultaneous alerts", () => {
+    it("returns protein + fiber + calorie_low alerts together at 9pm", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [makeMeal({ calories: 800, protein_g: 30, fiber_g: 5 })],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      const kinds = alerts.map((a) => a.kind)
+      expect(kinds).toContain("protein")
+      expect(kinds).toContain("fiber")
+      expect(kinds).toContain("calories_low")
+      expect(alerts.length).toBe(3)
     })
-    expect(alerts.find((a) => a.kind === "protein")).toBeUndefined()
   })
 
-  it("alerts fiber deficit after 6pm", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ fiber_g: 10, protein_g: 120, calories: 2000 })], // 20g fiber missing
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 19, 0), // 7pm
+  describe("empty meals with targets", () => {
+    it("alerts all deficits at 9pm with zero intake", () => {
+      const alerts = buildDeficitAlerts({
+        meals: [],
+        targets: makeTargets(),
+        now: new Date(2026, 4, 21, 21, 0),
+      })
+      const kinds = alerts.map((a) => a.kind)
+      expect(kinds).toContain("protein")
+      expect(kinds).toContain("fiber")
+      expect(kinds).toContain("calories_low")
     })
-    const fiberAlert = alerts.find((a) => a.kind === "fiber")
-    expect(fiberAlert).toBeDefined()
-    expect(fiberAlert!.severity).toBe("info")
-  })
-
-  it("alerts calorie undereating after 8pm (< 70%)", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ calories: 1000, protein_g: 120, fiber_g: 30 })], // 50% of 2000
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 21, 0), // 9pm
-    })
-    const calAlert = alerts.find((a) => a.kind === "calories_low")
-    expect(calAlert).toBeDefined()
-    expect(calAlert!.message).toContain("1000")
-  })
-
-  it("alerts calorie overeating after 8pm (> 115%)", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ calories: 2500, protein_g: 120, fiber_g: 30 })], // 125% of 2000
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 21, 0),
-    })
-    const calAlert = alerts.find((a) => a.kind === "calories_high")
-    expect(calAlert).toBeDefined()
-    expect(calAlert!.severity).toBe("warning")
-  })
-
-  it("does not alert calories between 70-115%", () => {
-    const alerts = buildDeficitAlerts({
-      meals: [makeMeal({ calories: 1800, protein_g: 120, fiber_g: 30 })], // 90%
-      targets: makeTargets(),
-      now: new Date(2026, 4, 21, 21, 0),
-    })
-    expect(alerts.find((a) => a.kind === "calories_low")).toBeUndefined()
-    expect(alerts.find((a) => a.kind === "calories_high")).toBeUndefined()
   })
 })

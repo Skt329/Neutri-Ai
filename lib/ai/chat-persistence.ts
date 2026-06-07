@@ -112,7 +112,9 @@ export async function persistMessages(opts: {
     if (lastUserText || assistantText) {
       generateConversationTitle(lastUserText, assistantText).then((title) => {
         if (title) {
-          supabase.from("conversations").update({ title }).eq("id", conversationId).then(() => {})
+          supabase.from("conversations").update({ title }).eq("id", conversationId).then(({ error }) => {
+            if (error) console.warn('[chat-persistence] Title update failed:', error.message)
+          })
         }
       }).catch((err) => {
         console.warn("[chat-persistence] Title generation failed (non-blocking):", err)

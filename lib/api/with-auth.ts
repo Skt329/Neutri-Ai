@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { apiError } from "@/lib/validation/with-validation"
+import { handleApiError } from "@/lib/api/error-handler"
 import { logger } from "@/lib/logger"
 import type { User } from "@supabase/supabase-js"
 
@@ -15,7 +16,7 @@ type AuthenticatedHandler = (
 /**
  * Wraps an API route with:
  *   1. Supabase auth (getUser with retry)
- *   2. Global error boundary
+ *   2. Global error boundary using typed AppError hierarchy
  *   3. Structured error responses
  *
  * Usage:
@@ -47,12 +48,9 @@ export function withAuth(handler: AuthenticatedHandler) {
     try {
       return await handler(req, { user, supabase })
     } catch (err) {
-      logger.error("api", "Unhandled route error", {
-        path: req.nextUrl.pathname,
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      })
-      return apiError("Internal server error", "INTERNAL_ERROR", 500)
+      // Use unified error handler — maps AppError subclasses to proper HTTP responses
+      return handleApiError(err, req.nextUrl.pathname)
     }
   }
 }
+

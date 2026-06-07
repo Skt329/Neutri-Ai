@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Check, ScanBarcode, AlertCircle, Flame, Drumstick, Wheat, Droplet, Salad, PackagePlus } from "lucide-react"
-import { PANTRY_CATEGORIES, CATEGORY_META, normalizeCategory, type PantryCategory } from "@/lib/categories"
+import { PANTRY_CATEGORIES, CATEGORY_META, type PantryCategory } from "@/lib/categories"
 import { cn } from "@/lib/utils"
 import type { NutritionLookupResult } from "@/lib/nutrition/types"
 
@@ -246,7 +246,7 @@ export function ProductResultCard({
 
 function NutriCell({
   icon: Icon,
-  label,
+  label: _label,
   value,
   unit,
   color,

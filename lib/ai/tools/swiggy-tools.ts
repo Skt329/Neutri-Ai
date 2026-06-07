@@ -6,7 +6,7 @@ import { getSwiggyAdapter, SwiggyNotConfiguredError } from "@/lib/swiggy/adapter
 /**
  * Swiggy food ordering tools.
  */
-export function buildSwiggyTools(supabase: SupabaseClient, userId: string) {
+export function buildSwiggyTools(_supabase: SupabaseClient, userId: string) {
   return {
     swiggy_search: tool({
       description: "Search Swiggy. Only use if the user asked to order.",

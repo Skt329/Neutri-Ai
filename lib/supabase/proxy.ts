@@ -24,7 +24,7 @@ const ALLOWED_ORIGINS = [
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   // Scripts: self + Vercel Analytics + Sentry
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://*.sentry.io",
+  `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval' " : ''}https://va.vercel-scripts.com https://*.sentry.io`,
   // Styles: self + Google Fonts (inline needed for Next.js)
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Fonts: self + Google Fonts static

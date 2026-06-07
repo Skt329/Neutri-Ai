@@ -12,28 +12,6 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const RestaurantSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  cuisines: z.array(z.string()).default([]),
-  rating: z.number().nullable(),
-  eta_minutes: z.number().nullable(),
-  is_veg: z.boolean().default(false),
-  price_for_two: z.number().nullable(),
-})
-
-const MenuItemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  price: z.number(),
-  is_veg: z.boolean().default(false),
-  description: z.string().nullable(),
-  estimated_calories: z.number().nullable(),
-  estimated_protein_g: z.number().nullable(),
-  estimated_carbs_g: z.number().nullable(),
-  estimated_fat_g: z.number().nullable(),
-})
-
 const CartItemSchema = z.object({
   menu_item_id: z.string(),
   name: z.string(),
@@ -43,15 +21,6 @@ const CartItemSchema = z.object({
   estimated_protein_g: z.number().nullable(),
   estimated_carbs_g: z.number().nullable(),
   estimated_fat_g: z.number().nullable(),
-})
-
-const InstamartProductSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  price: z.number(),
-  unit: z.string().nullable(),
-  quantity: z.number().nullable(),
-  image_url: z.string().nullable(),
 })
 
 // ── Helper: Get user dietary context ─────────────────────────────────────────

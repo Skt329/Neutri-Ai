@@ -11,7 +11,7 @@ import { lookupNutrition } from "@/lib/nutrition/nutrition-lookup"
 import { BarcodeRequestSchema } from "@/lib/validation/api-schemas"
 import { parseBody, apiError } from "@/lib/validation/with-validation"
 
-export const POST = withAuth(async (req, { user }) => {
+export const POST = withAuth(async (req, _ctx) => {
   // Validate barcode format with Zod
   const parsed = await parseBody(req, BarcodeRequestSchema)
   if (parsed instanceof NextResponse) return parsed

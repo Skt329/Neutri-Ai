@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Download, X, Wifi, WifiOff } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { useNetworkStatus } from '@/hooks/use-network-status'
 import { toast } from 'sonner'
 

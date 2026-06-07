@@ -1,5 +1,6 @@
+import { memo } from 'react'
 import Link from "next/link"
-import { MessageCircle, Sparkles, Coffee, Sun, Cookie, Moon } from "lucide-react"
+import { Coffee, Sun, Cookie, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { MealLog } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -17,7 +18,7 @@ interface MealSlotCardProps {
   index: number
 }
 
-export function MealSlotCard({ meal, type, index }: MealSlotCardProps) {
+function MealSlotCardInner({ meal, type, index }: MealSlotCardProps) {
   const meta = MEAL_TYPE_META[type]
 
   if (!meal) {
@@ -87,3 +88,5 @@ export function MealSlotCard({ meal, type, index }: MealSlotCardProps) {
     </div>
   )
 }
+
+export const MealSlotCard = memo(MealSlotCardInner)

@@ -10,7 +10,6 @@ import {
   ShoppingCart,
   Star,
   Clock,
-  Leaf,
   Minus,
   Plus,
   Package,

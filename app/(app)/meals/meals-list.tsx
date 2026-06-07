@@ -10,7 +10,7 @@ import { deleteMeal } from "./actions"
 import { toast } from "sonner"
 import { MealTypeIcon } from "@/components/category-icon"
 import { MEAL_TYPE_META, type MealType } from "@/lib/categories"
-import { cn } from "@/lib/utils"
+
 
 
 export function MealsList({ meals }: { meals: MealLog[] }) {

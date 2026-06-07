@@ -15,6 +15,11 @@ import { searchUSDA } from "./usda-client"
 import { searchOpenFoodFacts, getProductByBarcode } from "./openfoodfacts-client"
 import type { NutritionLookupResult } from "./types"
 
+// Security: This module uses SUPABASE_SERVICE_ROLE_KEY for cache writes.
+// It must NEVER be imported in client-side code (no 'use client' files).
+// The nutrition_cache table has public SELECT but service-role-only INSERT/UPDATE/DELETE.
+import 'server-only'
+
 // ── Cache config ─────────────────────────────────────────────────────────────
 
 const CACHE_TTL_DAYS = 30

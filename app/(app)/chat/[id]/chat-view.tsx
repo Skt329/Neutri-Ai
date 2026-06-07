@@ -35,10 +35,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Wrench, Sparkles, Image as ImageIcon, Paperclip, Check, AlertCircle, ChevronDown, ArrowDown, Copy, FileDown, Share2, Link2, Camera, X } from "lucide-react"
+import { ArrowLeft, MoreVertical, Send, Square, Trash2, Pencil, Leaf, User, Check, AlertCircle, ChevronDown, ArrowDown, Copy, FileDown, Share2, Camera, X } from "lucide-react"
 import { toast } from "sonner"
 import { deleteConversation, renameConversation } from "../actions"
-import { shareChat, revokeShare } from "../../profile/settings-actions"
+import { shareChat } from "../../profile/settings-actions"
 import { cn } from "@/lib/utils"
 
 import {

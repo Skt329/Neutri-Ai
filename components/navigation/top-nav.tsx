@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { MessageSquare, LayoutGrid, Package, UserCircle, Settings, LogOut } from 'lucide-react'
+import { MessageSquare, LayoutGrid, Package, UserCircle, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { StreakBadge } from '@/components/navigation/streak-badge'
 import { ThemeToggle } from '@/components/theme-toggle'
