@@ -55,7 +55,7 @@ import {
   type ProposePantryInput,
   type ProposePantryOutput,
 } from "@/components/chat-tool-cards"
-import { CLIENT_TOOL_NAMES } from "@/lib/ai/tools"
+import { CLIENT_TOOL_NAMES } from "@/lib/ai/tools/client-tool-names"
 import {
   SwiggyOrderReviewCard,
   RestaurantPickerCard,

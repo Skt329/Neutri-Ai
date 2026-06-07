@@ -38,17 +38,8 @@ export function buildTools(supabase: SupabaseClient, userId: string, opts?: { ti
 }
 
 /**
- * Toolset names by category. Used by the client view to decide which tool
- * parts render as interactive cards and which render as collapsible traces.
+ * Toolset names by category. Re-exported from a standalone file so client
+ * components can import directly without pulling in server-only builders.
  */
-export const CLIENT_TOOL_NAMES = [
-  "ask_user",
-  "choose_option",
-  "propose_meal_log",
-  "propose_pantry_items",
-  "propose_swiggy_order",
-  "propose_restaurant_pick",
-  "propose_menu_selection",
-  "propose_pantry_restock",
-] as const
-export type ClientToolName = (typeof CLIENT_TOOL_NAMES)[number]
+export { CLIENT_TOOL_NAMES, type ClientToolName } from "./tools/client-tool-names"
+
