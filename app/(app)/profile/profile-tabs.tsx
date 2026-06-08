@@ -1,8 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { User, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+type TabId = "profile" | "settings"
 
 interface ProfileTabsProps {
   profileContent: React.ReactNode
@@ -14,8 +17,33 @@ const TABS = [
   { id: "settings" as const, label: "Settings", icon: Settings },
 ]
 
+function isValidTab(v: string | null): v is TabId {
+  return v === "profile" || v === "settings"
+}
+
 export function ProfileTabs({ profileContent, settingsContent }: ProfileTabsProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile")
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState<TabId>(isValidTab(tabParam) ? tabParam : "profile")
+
+  // Sync when URL changes externally (e.g. dropdown menu navigation)
+  useEffect(() => {
+    if (isValidTab(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam, activeTab])
+
+  function handleTabChange(tab: TabId) {
+    setActiveTab(tab)
+    // Update URL without navigation so back button works and state is bookmarkable
+    const url = new URL(window.location.href)
+    if (tab === "profile") {
+      url.searchParams.delete("tab")
+    } else {
+      url.searchParams.set("tab", tab)
+    }
+    window.history.replaceState(null, "", url.toString())
+  }
 
   return (
     <div>
@@ -28,7 +56,7 @@ export function ProfileTabs({ profileContent, settingsContent }: ProfileTabsProp
               key={id}
               role="tab"
               aria-selected={isActive}
-              onClick={() => setActiveTab(id)}
+              onClick={() => handleTabChange(id)}
               className={cn(
                 "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium smooth-hover",
                 isActive
@@ -50,3 +78,4 @@ export function ProfileTabs({ profileContent, settingsContent }: ProfileTabsProp
     </div>
   )
 }
+
