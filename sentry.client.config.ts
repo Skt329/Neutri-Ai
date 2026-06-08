@@ -26,6 +26,8 @@ Sentry.init({
     "service worker",
     "TypeError: Failed to register a ServiceWorker",
     "NetworkError when attempting to fetch resource",
+    // html5-qrcode scanner lifecycle (cleanup race condition)
+    "Cannot stop, scanner is not running or paused",
     // AbortController cancellations (normal user navigation)
     "AbortError",
     "The operation was aborted",

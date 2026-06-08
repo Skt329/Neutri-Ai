@@ -89,7 +89,12 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
     return () => {
       mounted = false
       if (scanner) {
-        scanner.stop().then(() => scanner.clear()).catch((err: unknown) => console.warn("[barcode-scanner] Cleanup error:", err))
+        const isRunning = scanner.isScanning ?? scanner.getState?.() === 2 /* SCANNING */
+        if (isRunning) {
+          scanner.stop().then(() => scanner.clear()).catch(() => {/* already stopped */})
+        } else {
+          try { scanner.clear() } catch { /* not initialized */ }
+        }
       }
       html5QrRef.current = null
     }
