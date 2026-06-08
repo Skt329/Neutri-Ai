@@ -13,6 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#F6F1E9',
     theme_color: '#18382A',
     categories: ['health', 'fitness', 'food'],
+    scope: '/',
+    prefer_related_applications: false,
     icons: [
       {
         src: '/icon-192x192.png',
@@ -29,14 +31,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
-      },
-    ],
-    screenshots: [
-      {
-        src: '/icon-512x512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        form_factor: 'wide',
       },
     ],
   }

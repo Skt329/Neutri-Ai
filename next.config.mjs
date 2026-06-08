@@ -4,6 +4,7 @@ import { withSentryConfig } from '@sentry/nextjs'
 const withSerwist = withSerwistInit({
   swSrc: 'app/sw.ts',
   swDest: 'public/sw.js',
+  register: false,
   disable: process.env.NODE_ENV !== 'production',
 })
 

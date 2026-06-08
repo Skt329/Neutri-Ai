@@ -21,6 +21,11 @@ Sentry.init({
     "Failed to fetch",
     "Load failed",
     "NetworkError",
+    // Service Worker errors
+    "ServiceWorker",
+    "service worker",
+    "TypeError: Failed to register a ServiceWorker",
+    "NetworkError when attempting to fetch resource",
     // AbortController cancellations (normal user navigation)
     "AbortError",
     "The operation was aborted",

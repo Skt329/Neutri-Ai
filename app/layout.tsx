@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { RegisterSW } from "@/components/register-sw"
 import "./globals.css"
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -74,6 +75,7 @@ export default function RootLayout({
           {children}
           <Toaster richColors closeButton />
           <PwaInstallPrompt />
+          <RegisterSW />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
       </body>
