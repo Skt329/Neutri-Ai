@@ -32,4 +32,12 @@ export default tseslint.config(
       "**/*.d.ts",
     ],
   },
+  {
+    files: ["next.config.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+      },
+    },
+  },
 )

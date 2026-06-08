@@ -113,7 +113,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
         await track.torchFeature.apply(!torch)
         setTorch(!torch)
       }
-    } catch {}
+    } catch { /* torch not supported — ignore */ }
   }
 
   if (showManual) {

@@ -39,7 +39,7 @@ export function ChipInput({
   // Reset when defaultValue changes (e.g. after a server revalidate).
   useEffect(() => {
     setTags(dedupe(defaultValue))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [defaultValue.join("||")])
 
   function add(value: string) {

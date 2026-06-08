@@ -257,7 +257,7 @@ export function ChatView({
     const url = new URL(window.location.href)
     url.searchParams.delete("prefill")
     window.history.replaceState(null, "", url.toString())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [])
 
   // Keyboard shortcuts
