@@ -56,8 +56,8 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
           { facingMode: "environment" },
           {
             fps: 15,
-            qrbox: { width: 280, height: 150 },
-            aspectRatio: 1.5,
+            qrbox: { width: 250, height: 120 },
+            aspectRatio: 1.33,
             disableFlip: false,
           },
           (decodedText: string) => {
@@ -154,35 +154,36 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Camera viewfinder — fill available width, tall on mobile */}
+      {/* Camera viewfinder — aspect-ratio based, responsive height */}
       <div
         className={cn(
-          "relative w-full rounded-2xl overflow-hidden border-2 bg-ink/95",
+          "barcode-viewfinder relative w-full rounded-2xl overflow-hidden border-2 bg-ink/95",
           cameraActive ? "border-sage/40" : "border-border",
         )}
-        style={{ minHeight: "min(70vh, 480px)" }}
       >
+        {/* Scanner container — html5-qrcode renders video here */}
         <div
           ref={scannerRef}
-          className="absolute inset-0 barcode-scanner-region"
+          className="barcode-scanner-region w-full"
         />
 
         {/* Scanning overlay */}
         {cameraActive && (
-          <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 pointer-events-none z-[5]">
             {/* Scan target area */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] max-w-[300px] h-[45%] max-h-[160px]">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] max-w-[260px] h-[100px] sm:h-[120px]">
               <div className="absolute inset-0 border-2 border-sage/50 rounded-xl" />
-              <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-sage to-transparent animate-scan-line" />
+              {/* Animated scan line */}
+              <div className="absolute inset-x-2 h-0.5 bg-gradient-to-r from-transparent via-sage to-transparent animate-barcode-scan" />
               {/* Corner markers */}
-              <div className="absolute -top-px -left-px w-6 h-6 border-t-[3px] border-l-[3px] border-sage rounded-tl-lg" />
-              <div className="absolute -top-px -right-px w-6 h-6 border-t-[3px] border-r-[3px] border-sage rounded-tr-lg" />
-              <div className="absolute -bottom-px -left-px w-6 h-6 border-b-[3px] border-l-[3px] border-sage rounded-bl-lg" />
-              <div className="absolute -bottom-px -right-px w-6 h-6 border-b-[3px] border-r-[3px] border-sage rounded-br-lg" />
+              <div className="absolute -top-px -left-px w-5 h-5 border-t-[3px] border-l-[3px] border-sage rounded-tl-lg" />
+              <div className="absolute -top-px -right-px w-5 h-5 border-t-[3px] border-r-[3px] border-sage rounded-tr-lg" />
+              <div className="absolute -bottom-px -left-px w-5 h-5 border-b-[3px] border-l-[3px] border-sage rounded-bl-lg" />
+              <div className="absolute -bottom-px -right-px w-5 h-5 border-b-[3px] border-r-[3px] border-sage rounded-br-lg" />
             </div>
             {/* Hint text */}
-            <div className="absolute bottom-5 left-0 right-0 text-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink/60 backdrop-blur-sm text-xs text-white/90 font-medium">
+            <div className="absolute bottom-4 left-0 right-0 text-center">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink/60 backdrop-blur-sm text-[11px] text-white/90 font-medium">
                 <ScanBarcode className="size-3.5" /> Point at a product barcode
               </span>
             </div>
@@ -191,7 +192,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
 
         {/* Loading state */}
         {!cameraActive && !cameraError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
             <div className="size-10 rounded-full border-2 border-sage/30 border-t-sage animate-spin" />
             <p className="text-sm text-white/60 font-medium">Starting camera…</p>
           </div>
@@ -199,7 +200,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
 
         {/* Error state */}
         {cameraError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="flex flex-col items-center justify-center gap-4 p-6 py-14 text-center">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-clay/20 text-clay">
               <X className="size-6" />
             </div>
@@ -215,7 +216,7 @@ export function BarcodeScanner({ onScan, onClose, disabled }: BarcodeScannerProp
 
         {/* Torch toggle */}
         {cameraActive && (
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-3 right-3 z-[6]">
             <button
               onClick={toggleTorch}
               className="flex size-10 items-center justify-center rounded-full bg-ink/50 text-white/80 backdrop-blur-sm hover:bg-ink/70 smooth-hover"

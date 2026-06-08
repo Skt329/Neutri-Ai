@@ -455,37 +455,50 @@ html {
 
 /* ════════════════════════════════════════════
    html5-qrcode library overrides
-   Force the camera viewfinder to fill our container
+   Container uses flow layout — video sizes itself.
+   We hide all library chrome and draw our own overlay.
 ════════════════════════════════════════════ */
+
+/* Viewfinder wrapper — constrains camera to a sensible mobile height */
+.barcode-viewfinder {
+  position: relative;
+  max-height: min(56vh, 400px);
+  min-height: 240px;
+}
+
+/* Scanner container fills wrapper */
 .barcode-scanner-region {
   width: 100% !important;
-  height: 100% !important;
   min-height: 0 !important;
   border: none !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 .barcode-scanner-region > div {
   width: 100% !important;
-  height: 100% !important;
   border: none !important;
 }
+
+/* Video fills container with object-fit cover */
 .barcode-scanner-region video {
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
+  max-height: min(56vh, 400px) !important;
+  min-height: 240px !important;
   object-fit: cover !important;
-  position: absolute !important;
-  inset: 0 !important;
+  display: block !important;
   border: none !important;
+  border-radius: 1rem;
 }
-/* Hide library's built-in scan region + shaded areas — we draw our own overlay */
+
+/* Hide library's built-in scan region overlay, shaded areas, and chrome */
 .barcode-scanner-region canvas,
 .barcode-scanner-region img[alt="Info icon"],
 #qr-shaded-region {
   display: none !important;
 }
-/* Make the qrbox transparent (library draws a coloured border box) */
 #barcode-scanner-region__scan_region {
   width: 100% !important;
-  height: 100% !important;
   border: none !important;
   min-height: 0 !important;
 }
@@ -498,3 +511,18 @@ html {
 #barcode-scanner-region__dashboard_section {
   display: none !important;
 }
+
+/* ── Barcode scan-line animation ── */
+@keyframes barcode-scan {
+  0%   { top: 0; }
+  50%  { top: calc(100% - 2px); }
+  100% { top: 0; }
+}
+
+@layer utilities {
+  .animate-barcode-scan {
+    animation: barcode-scan 2.2s ease-in-out infinite;
+    position: absolute;
+  }
+}
+
